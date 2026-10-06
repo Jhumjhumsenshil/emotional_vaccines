@@ -26,13 +26,16 @@ def seed_users():
             # Hash password using Werkzeug
             hashed_pw = generate_password_hash(raw_password)
 
+            user_status = "approved" if role_name else "pending"
+
             # 1. Insert user if username doesn't exist
             cursor.execute("""
-                INSERT INTO users (username, name, email, password_hash)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (username) DO NOTHING
+                INSERT INTO users (username, name, email, password_hash, status, is_active)
+                VALUES (%s, %s, %s, %s, %s, true)
+                ON CONFLICT (username) DO UPDATE 
+                SET status = EXCLUDED.status, name = EXCLUDED.name, email = EXCLUDED.email
                 RETURNING id;
-            """, (username, name, email, hashed_pw))
+            """, (username, name, email, hashed_pw, user_status))
             
             result = cursor.fetchone()
 
@@ -53,10 +56,11 @@ def seed_users():
                     cursor.execute("""
                         INSERT INTO user_roles (user_id, role_id)
                         VALUES (%s, %s)
-                        ON CONFLICT DO NOTHING;
+                        ON CONFLICT (user_id, role_id) DO NOTHING;
                     """, (user_id, role_id))
 
-            print(f"[OK] Processed user: {username} ({role_name if role_name else 'No Role'})")
+            print(f"[OK] Processed user: {username} ({role_name if role_name else 'No Role'} - {user_status})")
+
 
         conn.commit()
         cursor.close()
