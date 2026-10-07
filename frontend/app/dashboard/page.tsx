@@ -61,7 +61,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {isAdmin && (
             <Link
-              href="/admin"
+              href="/admin/dashboard"
               className="btn-sm"
               style={{
                 background: 'var(--primary-color)',
@@ -201,7 +201,7 @@ export default function DashboardPage() {
                   Manage users, approve pending accounts, assign roles, and toggle access.
                 </div>
                 <Link
-                  href="/admin"
+                  href="/admin/dashboard"
                   style={{
                     fontSize: '0.8rem',
                     fontWeight: 600,

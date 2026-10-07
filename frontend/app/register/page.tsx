@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [registeredSuccess, setRegisteredSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -53,53 +54,45 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
+    <div className="relative min-h-screen w-full overflow-x-hidden flex items-center justify-center lg:justify-end lg:pr-16 xl:pr-32 p-4 sm:p-6 bg-slate-50">
+      {/* Full-viewport Light Background Image */}
+      <div
+        className="absolute inset-0 bg-cover bg-no-repeat bg-left-center bg-slate-50"
+        style={{ backgroundImage: "url('/images/login-bg.png')" }}
+      />
+
+      {/* Subtle overlay for mobile/tablet contrast */}
+      <div className="absolute inset-0 bg-slate-900/10 lg:hidden pointer-events-none" />
+
+      {/* Cover Gemini sparkle icon in bottom-right corner if present */}
+      <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 w-12 h-12 bg-white/90 rounded-full blur-xs pointer-events-none z-10" />
+
+      {/* Glassmorphic Auth Card for Light Theme */}
+      <div className="relative z-20 w-full max-w-md p-8 sm:p-10 rounded-2xl bg-white/85 backdrop-blur-2xl border border-white/80 shadow-2xl shadow-slate-900/10 glass-card-animate text-gray-900">
         {registeredSuccess ? (
-          /* Registration Success & Pending Approval Screen */
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '50%',
-                backgroundColor: '#fef3c7',
-                color: '#d97706',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.75rem',
-                margin: '0 auto 1.25rem',
-              }}
-            >
+          /* Registration Success Screen */
+          <div className="text-center py-2">
+            <div className="w-14 h-14 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center text-2xl mx-auto mb-4">
               ⏳
             </div>
 
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-              Registration Submitted!
-            </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Thank you for signing up, <strong style={{ color: 'var(--text-main)' }}>{formData.name}</strong>.
+            <h1 className="text-2xl font-bold text-[#1E3A5F] mb-2">Registration Submitted!</h1>
+            <p className="text-gray-600 text-sm mb-6">
+              Thank you for signing up, <strong className="text-gray-900 font-semibold">{formData.name}</strong>.
             </p>
 
-            <div className="pending-banner" style={{ textAlign: 'left', marginBottom: '1.75rem' }}>
-              <span className="pending-banner-icon">ℹ️</span>
-              <div>
-                <div className="pending-banner-title">Pending Administrator Approval</div>
-                <div className="pending-banner-text">
-                  Your account is waiting for Super Admin approval. Once an administrator assigns your role and activates your account, you will be able to log in.
-                </div>
+            <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm text-left shadow-2xs space-y-1">
+              <div className="font-semibold text-amber-900 flex items-center gap-1.5">
+                <span>ℹ️</span> Pending Administrator Approval
+              </div>
+              <div className="text-amber-800 leading-relaxed pt-1">
+                Your account is waiting for Super Admin approval. Once an administrator assigns your role and activates your account, you will be able to log in.
               </div>
             </div>
 
             <Link
               href="/login"
-              className="btn-primary"
-              style={{
-                display: 'block',
-                textDecoration: 'none',
-                textAlign: 'center',
-              }}
+              className="bg-gradient-to-r from-[#0D6E5B] to-emerald-600 hover:from-[#0B5B4B] hover:to-emerald-700 text-white font-semibold rounded-lg h-11 w-full hover:brightness-110 active:scale-[0.99] transition-all shadow-lg shadow-emerald-900/15 flex items-center justify-center gap-2"
             >
               Back to Sign In
             </Link>
@@ -107,78 +100,124 @@ export default function RegisterPage() {
         ) : (
           /* Registration Form */
           <>
-            <div className="auth-header">
-              <h1>Create Account</h1>
-              <p>Register with your name, email, and password</p>
+            <div className="mb-6 text-left">
+              <h1 className="text-3xl font-bold text-[#1E3A5F] tracking-tight">Create Account</h1>
+              <p className="text-gray-600 text-sm mt-1">Register with your name, email, and password</p>
             </div>
 
-            {error && <div className="error-banner">{error}</div>}
+            {error && (
+              <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm shadow-2xs">
+                <strong className="font-semibold text-gray-900">Error: </strong> {error}
+              </div>
+            )}
 
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label htmlFor="name">Full Name</label>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="name" className="text-gray-700 text-sm font-semibold mb-1.5 block">
+                  Full Name
+                </label>
                 <input
                   id="name"
                   name="name"
                   type="text"
                   required
-                  className="form-control"
+                  className="glass-input-light bg-white border border-gray-300/80 text-gray-900 placeholder:text-gray-400 rounded-lg h-11 px-4 text-sm w-full focus:outline-none focus:ring-2 focus:ring-[#0D6E5B] focus:border-[#0D6E5B] transition-all shadow-2xs"
                   placeholder="e.g. Jane Doe"
                   value={formData.name}
                   onChange={handleChange}
                 />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="email">Email Address</label>
+              <div>
+                <label htmlFor="email" className="text-gray-700 text-sm font-semibold mb-1.5 block">
+                  Email Address
+                </label>
                 <input
                   id="email"
                   name="email"
                   type="email"
                   required
-                  className="form-control"
+                  className="glass-input-light bg-white border border-gray-300/80 text-gray-900 placeholder:text-gray-400 rounded-lg h-11 px-4 text-sm w-full focus:outline-none focus:ring-2 focus:ring-[#0D6E5B] focus:border-[#0D6E5B] transition-all shadow-2xs"
                   placeholder="jane@example.com"
                   value={formData.email}
                   onChange={handleChange}
                 />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="username">
-                  Username <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span>
+              <div>
+                <label htmlFor="username" className="text-gray-700 text-sm font-semibold mb-1.5 block">
+                  Username <span className="text-gray-400 font-normal">(Optional)</span>
                 </label>
                 <input
                   id="username"
                   name="username"
                   type="text"
-                  className="form-control"
+                  className="glass-input-light bg-white border border-gray-300/80 text-gray-900 placeholder:text-gray-400 rounded-lg h-11 px-4 text-sm w-full focus:outline-none focus:ring-2 focus:ring-[#0D6E5B] focus:border-[#0D6E5B] transition-all shadow-2xs"
                   placeholder="janedoe (defaults to email prefix)"
                   value={formData.username}
                   onChange={handleChange}
                 />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="password">Password</label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  className="form-control"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={handleChange}
-                />
+              <div>
+                <label htmlFor="password" className="text-gray-700 text-sm font-semibold mb-1.5 block">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    className="glass-input-light bg-white border border-gray-300/80 text-gray-900 placeholder:text-gray-400 rounded-lg h-11 pl-4 pr-11 text-sm w-full focus:outline-none focus:ring-2 focus:ring-[#0D6E5B] focus:border-[#0D6E5B] transition-all shadow-2xs"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors focus:outline-none"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858-5.908a10.025 10.025 0 012.122-.363c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21M3 3l18 18" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Creating Account...' : 'Register Account'}
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-gradient-to-r from-[#0D6E5B] to-emerald-600 hover:from-[#0B5B4B] hover:to-emerald-700 text-white font-semibold rounded-lg h-11 w-full hover:brightness-110 active:scale-[0.99] transition-all shadow-lg shadow-emerald-900/15 flex items-center justify-center gap-2 mt-6 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Creating Account...</span>
+                  </>
+                ) : (
+                  <span>Register Account</span>
+                )}
               </button>
             </form>
 
-            <div className="auth-footer">
-              Already have an account? <Link href="/login">Sign in here</Link>
+            <div className="text-gray-600 text-sm mt-6 text-center">
+              Already have an account?{' '}
+              <Link href="/login" className="text-[#0D6E5B] hover:text-[#0B5B4B] font-semibold hover:underline transition-colors">
+                Sign in here
+              </Link>
             </div>
           </>
         )}
