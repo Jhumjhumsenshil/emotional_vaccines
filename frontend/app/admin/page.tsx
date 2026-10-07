@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import AppLayout from '../components/layout/AppLayout';
 
 interface UserItem {
   id: number;
@@ -199,36 +199,9 @@ export default function SuperAdminDashboard() {
   }
 
   return (
-    <div className="dashboard-layout">
-      {/* Top Header */}
-      <nav className="dashboard-nav">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div className="dashboard-logo">EmotionalVaccine</div>
-          <span className="badge badge-role">Super Admin Panel</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link
-            href="/dashboard"
-            style={{
-              fontSize: '0.875rem',
-              color: 'var(--text-muted)',
-              textDecoration: 'none',
-              fontWeight: 500,
-            }}
-          >
-            My User Dashboard
-          </Link>
-          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>
-            {currentUser.name}
-          </div>
-          <button onClick={handleLogout} className="btn-danger">
-            Logout
-          </button>
-        </div>
-      </nav>
-
+    <AppLayout title="User Management & Approvals">
       {/* Main Admin Dashboard Container */}
-      <main className="admin-container">
+      <div className="admin-container" style={{ margin: 0, maxWidth: '100%', padding: 0 }}>
         {/* Header Title Row */}
         <div className="admin-header-row">
           <div className="admin-title-area">
@@ -504,7 +477,7 @@ export default function SuperAdminDashboard() {
             </div>
           )}
         </div>
-      </main>
+      </div>
 
       {/* Floating Toast Notification */}
       {toast && (
@@ -515,6 +488,6 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
       )}
-    </div>
+    </AppLayout>
   );
 }
