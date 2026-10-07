@@ -424,12 +424,13 @@ export default function SuperAdminDashboard() {
                               setSelectedRoles({ ...selectedRoles, [user.id]: e.target.value })
                             }
                             disabled={isSelf || actionLoading[user.id]}
-                          >
-                            <option value="Administrator">Administrator</option>
-                            <option value="Content Manager">Content Manager</option>
-                            <option value="Report Viewer">Report Viewer</option>
-                            <option value="Manager">Manager</option>
-                            <option value="Super Admin">Super Admin</option>
+                          >                           
+                              {/* Dynamic role mapping */}
+                              {roles.map((role) => (
+                                <option key={role.id} value={role.name}>
+                                  {role.name}
+                                </option>
+                              ))}
                           </select>
                         </td>
 

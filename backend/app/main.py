@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.db import get_db
 from app.models import User, Role
+from app import models,schemas
 
 
 app = FastAPI(title="Video Portal & EmotionalVaccine API")
@@ -311,4 +312,8 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
             detail=f"Failed to delete user: {str(e)}"
         )
 
-    return {"message": f"User {user.name} ({user.username}) was deleted."}
+    return {"message": f"User {user.name} ({user.username}) was deleted."}
+
+@app.get("/api/roles", response_model=list[schemas.RoleOut])
+def get_all_roles(db: Session = Depends(get_db)):
+    return db.query(models.Role).all()
