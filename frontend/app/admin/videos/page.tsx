@@ -1,10 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AppLayout from '../../components/layout/AppLayout';
 import { Video, Category, getMockVideos, saveMockVideos, getMockCategories } from '../../../services/mockData';
 import { Button, Input, Select, Badge } from '../../components/ui/FormComponents';
 import Modal from '../../components/ui/Modal';
+
+const AVAILABLE_LANGUAGES = [
+  'English',
+  'Hindi',
+  'Spanish',
+  'French',
+  'German',
+  'Mandarin',
+  'Arabic',
+  'Bengali',
+  'Portuguese',
+  'Russian',
+  'Japanese',
+  'Italian',
+  'Korean',
+  'Telugu',
+  'Tamil',
+  'Marathi',
+  'Gujarati',
+  'Urdu',
+  'Kannada',
+  'Malayalam',
+  'Punjabi',
+];
 
 export default function VideosPage() {
   const [videos, setVideos] = useState<Video[]>([]);
@@ -16,21 +40,79 @@ export default function VideosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const [formData, setFormData] = useState<Partial<Video>>({});
+  const [videoUrls, setVideoUrls] = useState<string[]>(['']);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['English']);
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const [langSearch, setLangSearch] = useState('');
+  const langDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setVideos(getMockVideos());
     setCategories(getMockCategories());
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(event.target as Node)) {
+        setIsLangDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleLanguage = (lang: string) => {
+    if (selectedLanguages.includes(lang)) {
+      if (selectedLanguages.length > 1) {
+        setSelectedLanguages(selectedLanguages.filter(l => l !== lang));
+      }
+    } else {
+      setSelectedLanguages([...selectedLanguages, lang]);
+    }
+  };
+
+  const handleAddUrl = () => {
+    setVideoUrls([...videoUrls, '']);
+  };
+
+  const handleRemoveUrl = (index: number) => {
+    if (videoUrls.length > 1) {
+      setVideoUrls(videoUrls.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleUrlChange = (index: number, value: string) => {
+    const updated = [...videoUrls];
+    updated[index] = value;
+    setVideoUrls(updated);
+  };
+
+  const filteredLanguages = AVAILABLE_LANGUAGES.filter(lang =>
+    lang.toLowerCase().includes(langSearch.toLowerCase())
+  );
+
   const handleSave = () => {
-    if (!formData.title || !formData.categoryId || !formData.videoUrl) return;
+    const cleanUrls = videoUrls.map(u => u.trim()).filter(Boolean);
+    if (!formData.title || !formData.categoryId || cleanUrls.length === 0) return;
+    
+    const primaryUrl = cleanUrls[0];
+    const langs = selectedLanguages.length > 0 ? selectedLanguages : ['English'];
+    const languageString = langs.join(', ');
+
+    const payload: Partial<Video> = {
+      ...formData,
+      videoUrl: primaryUrl,
+      videoUrls: cleanUrls,
+      language: languageString,
+      languages: langs,
+    };
     
     let updated;
     if (editingVideo) {
-      updated = videos.map(v => v.id === editingVideo.id ? { ...v, ...formData } as Video : v);
+      updated = videos.map(v => v.id === editingVideo.id ? { ...v, ...payload } as Video : v);
     } else {
       updated = [...videos, { 
-        ...formData,
+        ...payload,
         id: `v_${Date.now()}`,
         views: 0,
         createdAt: new Date().toISOString(),
@@ -64,20 +146,35 @@ export default function VideosPage() {
     if (video) {
       setEditingVideo(video);
       setFormData({ ...video, tags: video.tags.join(', ') as any });
+      const urls = video.videoUrls && video.videoUrls.length > 0 
+        ? video.videoUrls 
+        : (video.videoUrl ? [video.videoUrl] : ['']);
+      setVideoUrls(urls);
+      
+      const langs = video.languages && video.languages.length > 0
+        ? video.languages
+        : (video.language ? video.language.split(',').map(s => s.trim()).filter(Boolean) : ['English']);
+      setSelectedLanguages(langs.length > 0 ? langs : ['English']);
     } else {
       setEditingVideo(null);
       setFormData({ 
-        title: '', description: '', categoryId: '', videoUrl: '', thumbnail: '',
-        language: 'English', duration: 0, isPublished: false, isFeatured: false,
+        title: '', description: '', categoryId: '', thumbnail: '',
+        duration: 0, isPublished: false, isFeatured: false,
         tags: [] as any, displayOrder: videos.length + 1
       });
+      setVideoUrls(['']);
+      setSelectedLanguages(['English']);
     }
+    setIsLangDropdownOpen(false);
+    setLangSearch('');
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingVideo(null);
+    setIsLangDropdownOpen(false);
+    setLangSearch('');
   };
 
   const filtered = videos.filter(v => {
@@ -223,17 +320,135 @@ export default function VideosPage() {
             <option value="">Select Category...</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
-          <Input 
-            label="Language" 
-            value={formData.language || ''} 
-            onChange={e => setFormData({...formData, language: e.target.value})} 
-          />
-          <div className="col-span-2">
-            <Input 
-              label="Video URL / Stream URL" 
-              value={formData.videoUrl || ''} 
-              onChange={e => setFormData({...formData, videoUrl: e.target.value})} 
-            />
+          <div className="w-full mb-4 relative" ref={langDropdownRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Language <span className="text-xs text-gray-400 font-normal">({selectedLanguages.length} selected)</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
+              className="w-full min-h-[38px] px-3 py-1.5 bg-white border border-gray-300 rounded-md text-sm shadow-sm flex items-center justify-between text-left focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
+            >
+              <div className="flex flex-wrap gap-1 items-center flex-1 pr-2">
+                {selectedLanguages.length === 0 ? (
+                  <span className="text-gray-400">Select language...</span>
+                ) : (
+                  selectedLanguages.map(lang => (
+                    <span
+                      key={lang}
+                      className="inline-flex items-center gap-1 bg-blue-50 text-[#2563EB] border border-blue-200 text-xs font-medium px-2 py-0.5 rounded"
+                    >
+                      {lang}
+                      <span
+                        role="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleLanguage(lang);
+                        }}
+                        className="text-blue-400 hover:text-blue-700 font-bold leading-none cursor-pointer"
+                        title="Remove"
+                      >
+                        ×
+                      </span>
+                    </span>
+                  ))
+                )}
+              </div>
+              <svg 
+                className={`w-4 h-4 text-gray-400 shrink-0 ml-1 transition-transform ${isLangDropdownOpen ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {isLangDropdownOpen && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 flex flex-col">
+                <div className="p-2 border-b border-gray-100">
+                  <input
+                    type="text"
+                    placeholder="Search languages..."
+                    value={langSearch}
+                    onChange={e => setLangSearch(e.target.value)}
+                    className="w-full px-2.5 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:border-[#2563EB]"
+                    onClick={e => e.stopPropagation()}
+                  />
+                </div>
+                <div className="overflow-y-auto max-h-44 p-1">
+                  {filteredLanguages.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-gray-400 text-center">No language found</div>
+                  ) : (
+                    filteredLanguages.map(lang => {
+                      const isSelected = selectedLanguages.includes(lang);
+                      return (
+                        <div
+                          key={lang}
+                          onClick={() => toggleLanguage(lang)}
+                          className={`flex items-center justify-between px-3 py-1.5 text-xs rounded cursor-pointer transition-colors ${
+                            isSelected ? 'bg-blue-50 text-[#2563EB] font-medium' : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}}
+                              className="rounded border-gray-300 text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                            />
+                            <span>{lang}</span>
+                          </div>
+                          {isSelected && <span className="text-[#2563EB] text-xs font-bold">✓</span>}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="col-span-2 mb-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700">
+                Video URLs / Stream URLs
+              </label>
+              <button
+                type="button"
+                onClick={handleAddUrl}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#2563EB] hover:text-[#1D4ED8]"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add URL
+              </button>
+            </div>
+            <div className="space-y-2">
+              {videoUrls.map((url, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={url}
+                    placeholder={index === 0 ? "e.g. https://example.com/video.mp4 (Primary URL)" : `URL ${index + 1}`}
+                    onChange={e => handleUrlChange(index, e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
+                  />
+                  {videoUrls.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveUrl(index)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      title="Remove URL"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
           <div className="col-span-2">
             <Input 

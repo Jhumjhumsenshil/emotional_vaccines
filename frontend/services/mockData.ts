@@ -4,8 +4,10 @@ export interface Video {
   description: string;
   categoryId: string;
   videoUrl: string;
+  videoUrls?: string[];
   thumbnail: string;
   language: string;
+  languages?: string[];
   duration: number; // in seconds
   isPublished: boolean;
   isFeatured: boolean;
