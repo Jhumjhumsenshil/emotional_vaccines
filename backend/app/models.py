@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Table, func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Table, func, SmallInteger, Text
 from sqlalchemy.orm import relationship
 from app.db import Base
 
@@ -31,4 +31,13 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    roles = relationship("Role", secondary=user_roles, back_populates="users")
+    roles = relationship("Role", secondary=user_roles, back_populates="users")
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    slug = Column(String, nullable = True)
+    status = Column(SmallInteger, nullable=False)    

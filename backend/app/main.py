@@ -317,3 +317,91 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
 @app.get("/api/roles", response_model=list[schemas.RoleOut])
 def get_all_roles(db: Session = Depends(get_db)):
     return db.query(models.Role).all()
+
+@app.post("/api/categories", response_model=schemas.CategoryOut, status_code=status.HTTP_201_CREATED)
+def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db)):
+    # 1. Check if category name already exists
+    existing_category = db.query(models.Category).filter(
+        models.Category.name == category.name
+    ).first()
+    
+    if existing_category:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Category with this name already exists"
+        )
+    
+    # 2. Save new category to database
+    new_category = models.Category(
+        name=category.name,
+        description=category.description,
+        slug=category.name,
+        status=1
+    )
+    db.add(new_category)
+    db.commit()
+    db.refresh(new_category)
+    
+    return new_category
+
+
+# 1. GET ALL CATEGORIES
+@app.get("/api/categories", response_model=list[schemas.CategoryOut])
+def get_categories(db: Session = Depends(get_db)):
+    return db.query(models.Category).all()
+
+
+# 2. UPDATE CATEGORY (PUT)
+@app.put("/api/categories/{category_id}", response_model=schemas.CategoryOut)
+def update_category(
+    category_id: int, 
+    category_data: schemas.CategoryUpdate, 
+    db: Session = Depends(get_db)
+):
+    category = db.query(models.Category).filter(models.Category.id == category_id).first()
+    
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Category not found"
+        )
+
+    # Check for name conflict if changing name
+    if category_data.name and category_data.name != category.name:
+        existing = db.query(models.Category).filter(models.Category.name == category_data.name).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Category name already exists"
+            )
+        category.name = category_data.name
+
+    if category_data.description is not None:
+        category.description = category_data.description
+
+    if category_data.slug is not None:
+            category.slug = category_data.slug 
+
+    
+    if category_data.status is not None:
+        category.status = category_data.status           
+
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+# 3. DELETE CATEGORY
+@app.delete("/api/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_category(category_id: int, db: Session = Depends(get_db)):
+    category = db.query(models.Category).filter(models.Category.id == category_id).first()
+    
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Category not found"
+        )
+
+    db.delete(category)
+    db.commit()
+    return None

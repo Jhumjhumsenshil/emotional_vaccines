@@ -2,55 +2,144 @@
 
 import { useState, useEffect } from 'react';
 import AppLayout from '../../components/layout/AppLayout';
-import { Category, getMockCategories, saveMockCategories } from '../../../services/mockData';
 import { Button, Input, Badge } from '../../components/ui/FormComponents';
 import Modal from '../../components/ui/Modal';
+
+// Update interface to support numeric ID from FastAPI / PostgreSQL
+export interface Category {
+  id: number | string;
+  name: string;
+  description?: string;
+  slug: string;
+  status: number; // 1 = Active, 0 = Inactive
+  videoCount?: number;
+}
+
+const API_BASE_URL = 'http://localhost:8000/api';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '' });
+  const [formData, setFormData] = useState({ name: '', description: '', slug: '', status: 1 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setCategories(getMockCategories());
-  }, []);
-
-  const handleSave = () => {
-    if (!formData.name.trim()) return;
-    
-    let updated;
-    if (editingCategory) {
-      updated = categories.map(c => c.id === editingCategory.id ? { ...c, ...formData } : c);
-    } else {
-      updated = [...categories, { 
-        id: `c_${Date.now()}`, 
-        name: formData.name, 
-        description: formData.description, 
-        videoCount: 0 
-      }];
+  // 1. Fetch categories from Backend API
+  const fetchCategories = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const res = await fetch(`${API_BASE_URL}/categories`);
+      if (!res.ok) throw new Error('Failed to fetch categories');
+      const data = await res.json();
+      setCategories(data);
+    } catch (err: any) {
+      setError(err.message || 'Error connecting to server');
+    } finally {
+      setIsLoading(false);
     }
-    setCategories(updated);
-    saveMockCategories(updated);
-    closeModal();
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this category?')) {
-      const updated = categories.filter(c => c.id !== id);
-      setCategories(updated);
-      saveMockCategories(updated);
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+
+  // Inline status toggle directly from the table
+  const handleToggleStatus = async (category: Category) => {
+    const newStatus = category.status === 1 ? 0 : 1;
+
+    // Optimistic UI update
+    setCategories(prev =>
+      prev.map(c => (c.id === category.id ? { ...c, status: newStatus } : c))
+    );
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories/${category.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to update status');
+      }
+    } catch (err: any) {
+      alert(err.message);
+      // Revert if API fails
+      fetchCategories();
+    }
+  };
+
+  // 2. Handle Add / Edit Category API Call
+  const handleSave = async () => {
+    if (!formData.name.trim()) return;
+
+    try {
+      if (editingCategory) {
+        // PUT / PATCH request to update category
+        const res = await fetch(`${API_BASE_URL}/categories/${editingCategory.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.detail || 'Failed to update category');
+        }
+      } else {
+        // POST request to add new category
+        const res = await fetch(`${API_BASE_URL}/categories`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.detail || 'Failed to create category');
+        }
+      }
+
+      // Re-fetch category list and close modal
+      await fetchCategories();
+      closeModal();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  // 3. Handle Delete Category API Call
+  const handleDelete = async (id: number | string) => {
+    if (!confirm('Are you sure you want to delete this category?')) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.detail || 'Failed to delete category');
+      }
+
+      // Re-fetch category list after deletion
+      await fetchCategories();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
   const openModal = (category?: Category) => {
     if (category) {
       setEditingCategory(category);
-      setFormData({ name: category.name, description: category.description });
+      setFormData({ name: category.name, description: category.description || '', slug: category.slug, status: category.status ?? 1 });
     } else {
       setEditingCategory(null);
-      setFormData({ name: '', description: '' });
+      setFormData({ name: '', description: '' , slug: '', status: 1});
     }
     setIsModalOpen(true);
   };
@@ -60,9 +149,9 @@ export default function CategoriesPage() {
     setEditingCategory(null);
   };
 
-  const filtered = categories.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) || 
-    c.description.toLowerCase().includes(search.toLowerCase())
+  const filtered = categories.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    (c.description && c.description.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -79,27 +168,52 @@ export default function CategoriesPage() {
         <Button onClick={() => openModal()}>Add Category</Button>
       </div>
 
+      {error && (
+        <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg">
+          {error}
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Videos</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Loading categories...</td>
+              </tr>
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-8 text-center text-gray-500">No categories found.</td>
               </tr>
             ) : filtered.map(category => (
               <tr key={category.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{category.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{category.description}</td>
+                <td className="px-6 py-4 text-sm text-gray-500">{category.description || '-'}</td>
+                {/* Clickable Status Badge */}
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <button
+                    onClick={() => handleToggleStatus(category)}
+                    className={`px-3 py-1 text-xs font-medium rounded-full border transition-all duration-150 focus:outline-none cursor-pointer ${
+                      category.status === 1
+                        ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
+                        : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                    }`}
+                    title="Click to toggle status"
+                  >
+                    {category.status === 1 ? '● Active' : '○ Inactive'}
+                  </button>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <Badge variant="blue">{category.videoCount} videos</Badge>
+                  <Badge variant="blue">{category.videoCount ?? 0} videos</Badge>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button onClick={() => openModal(category)} className="text-[#2563EB] hover:text-[#1D4ED8] mr-4">Edit</button>
@@ -127,6 +241,12 @@ export default function CategoriesPage() {
             label="Category Name" 
             value={formData.name} 
             onChange={e => setFormData({...formData, name: e.target.value})} 
+            autoFocus
+          />
+          <Input 
+            label="Slug" 
+            value={formData.slug} 
+            onChange={e => setFormData({...formData, slug: e.target.value})} 
             autoFocus
           />
           <div>
