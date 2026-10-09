@@ -3,12 +3,13 @@ from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.db import get_db
-from app.models import User, Role
-from app import models,schemas
+from app.models import User, Role, Permission
+from app import models, schemas
 
 
 app = FastAPI(title="Video Portal & EmotionalVaccine API")
@@ -168,17 +169,191 @@ def login_user(credentials: LoginSchema, db: Session = Depends(get_db)):
 # ----------------------------------------------------
 # Roles & Admin User Management Endpoints
 # ----------------------------------------------------
-@app.get("/api/roles")
+@app.get("/api/permissions", response_model=list[schemas.PermissionOut])
+def get_all_permissions(db: Session = Depends(get_db)):
+    return db.query(Permission).order_by(Permission.id.asc()).all()
+
+
+@app.get("/api/roles", response_model=list[schemas.RoleDetailOut])
 def get_roles(db: Session = Depends(get_db)):
-    roles = db.query(Role).all()
+    roles = db.query(Role).options(joinedload(Role.permissions), joinedload(Role.users)).order_by(Role.id.asc()).all()
+    # Unique across joinedload
+    unique_roles = {r.id: r for r in roles}.values()
     return [
-        {
-            "id": r.id,
-            "name": r.name,
-            "description": r.description
-        }
-        for r in roles
+        schemas.RoleDetailOut(
+            id=r.id,
+            name=r.name,
+            description=r.description,
+            users_count=len(r.users),
+            permissions=[
+                schemas.PermissionOut(id=p.id, slug=p.slug, description=p.description)
+                for p in r.permissions
+            ]
+        )
+        for r in unique_roles
     ]
+
+
+@app.get("/api/roles/{role_id}", response_model=schemas.RoleDetailOut)
+def get_role_by_id(role_id: int, db: Session = Depends(get_db)):
+    role = db.query(Role).options(joinedload(Role.permissions), joinedload(Role.users)).filter(Role.id == role_id).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Role with ID {role_id} not found."
+        )
+    return schemas.RoleDetailOut(
+        id=role.id,
+        name=role.name,
+        description=role.description,
+        users_count=len(role.users),
+        permissions=[
+            schemas.PermissionOut(id=p.id, slug=p.slug, description=p.description)
+            for p in role.permissions
+        ]
+    )
+
+
+@app.post("/api/roles", response_model=schemas.RoleDetailOut, status_code=status.HTTP_201_CREATED)
+def create_role(payload: schemas.RoleCreate, db: Session = Depends(get_db)):
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Role name cannot be empty."
+        )
+    
+    existing = db.query(Role).filter(func.lower(Role.name) == name.lower()).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A role with the name '{name}' already exists."
+        )
+    
+    assigned_permissions = []
+    if payload.permission_ids:
+        assigned_permissions = db.query(Permission).filter(Permission.id.in_(payload.permission_ids)).all()
+    
+    new_role = Role(
+        name=name,
+        description=payload.description.strip() if payload.description else None,
+        permissions=assigned_permissions
+    )
+    
+    try:
+        db.add(new_role)
+        db.commit()
+        db.refresh(new_role)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create role: {str(e)}"
+        )
+    
+    return schemas.RoleDetailOut(
+        id=new_role.id,
+        name=new_role.name,
+        description=new_role.description,
+        users_count=0,
+        permissions=[
+            schemas.PermissionOut(id=p.id, slug=p.slug, description=p.description)
+            for p in new_role.permissions
+        ]
+    )
+
+
+@app.put("/api/roles/{role_id}", response_model=schemas.RoleDetailOut)
+def update_role(role_id: int, payload: schemas.RoleUpdate, db: Session = Depends(get_db)):
+    role = db.query(Role).options(joinedload(Role.permissions), joinedload(Role.users)).filter(Role.id == role_id).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Role with ID {role_id} not found."
+        )
+    
+    if payload.name is not None:
+        name = payload.name.strip()
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Role name cannot be empty."
+            )
+        if role.name == "Super Admin" and name != "Super Admin":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The name of 'Super Admin' role cannot be modified."
+            )
+        existing = db.query(Role).filter(func.lower(Role.name) == name.lower(), Role.id != role_id).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Another role with the name '{name}' already exists."
+            )
+        role.name = name
+
+    if payload.description is not None:
+        role.description = payload.description.strip() if payload.description else None
+
+    if payload.permission_ids is not None:
+        perms = db.query(Permission).filter(Permission.id.in_(payload.permission_ids)).all()
+        role.permissions = perms
+
+    try:
+        db.commit()
+        db.refresh(role)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update role: {str(e)}"
+        )
+
+    return schemas.RoleDetailOut(
+        id=role.id,
+        name=role.name,
+        description=role.description,
+        users_count=len(role.users),
+        permissions=[
+            schemas.PermissionOut(id=p.id, slug=p.slug, description=p.description)
+            for p in role.permissions
+        ]
+    )
+
+
+@app.delete("/api/roles/{role_id}")
+def delete_role(role_id: int, db: Session = Depends(get_db)):
+    role = db.query(Role).options(joinedload(Role.users)).filter(Role.id == role_id).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Role with ID {role_id} not found."
+        )
+
+    if role.name in ["Super Admin", "Administrator"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"System role '{role.name}' cannot be deleted."
+        )
+
+    if role.users and len(role.users) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete role '{role.name}' because {len(role.users)} user(s) are currently assigned to it. Please reassign those users first."
+        )
+
+    try:
+        db.delete(role)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete role: {str(e)}"
+        )
+
+    return {"message": f"Role '{role.name}' has been successfully deleted."}
+
 
 
 @app.get("/api/admin/users")
@@ -313,10 +488,6 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
         )
 
     return {"message": f"User {user.name} ({user.username}) was deleted."}
-
-@app.get("/api/roles", response_model=list[schemas.RoleOut])
-def get_all_roles(db: Session = Depends(get_db)):
-    return db.query(models.Role).all()
 
 @app.post("/api/categories", response_model=schemas.CategoryOut, status_code=status.HTTP_201_CREATED)
 def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db)):

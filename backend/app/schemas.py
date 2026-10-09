@@ -1,12 +1,41 @@
 from pydantic import BaseModel
 from typing import Optional
 
-class RoleOut(BaseModel):
+class PermissionOut(BaseModel):
     id: int
-    name: str
+    slug: str
+    description: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+class RoleOut(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class RoleDetailOut(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    users_count: int = 0
+    permissions: list[PermissionOut] = []
+
+    class Config:
+        from_attributes = True
+
+class RoleCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    permission_ids: list[int] = []
+
+class RoleUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    permission_ids: Optional[list[int]] = None
 
 class CategoryCreate(BaseModel):
     name: str

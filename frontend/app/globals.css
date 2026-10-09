@@ -725,3 +725,16 @@ body {
     transform: translateY(0) scale(1);
   }
 }
+
+/* Clean Auth Page Background (Seamless on all screens) */
+.auth-bg-layer {
+  position: absolute;
+  inset: 0;
+  background-image: url('/images/auth-bg-clean.png');
+  background-repeat: no-repeat;
+  background-color: #f8fafc;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+

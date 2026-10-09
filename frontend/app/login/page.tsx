@@ -52,24 +52,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-x-hidden flex items-center justify-center lg:justify-end lg:pr-16 xl:pr-32 p-4 sm:p-6 bg-slate-50">
-      {/* Full-viewport Light Background Image */}
-      <div
-        className="absolute inset-0 bg-cover bg-no-repeat bg-left-center bg-slate-50"
-        style={{ backgroundImage: "url('/images/login-bg.png')" }}
-      />
+    <div className="relative min-h-screen w-full overflow-x-hidden flex items-center justify-center p-4 sm:p-6 bg-slate-50">
+      {/* Full-viewport Background with seamless cover */}
+      <div className="auth-bg-layer" />
 
-      {/* Subtle overlay for mobile/tablet contrast */}
-      <div className="absolute inset-0 bg-slate-900/10 lg:hidden pointer-events-none" />
+      {/* Subtle ambient overlay */}
+      <div className="absolute inset-0 bg-slate-900/[0.02] pointer-events-none" />
 
-      {/* Cover Gemini sparkle icon in bottom-right corner if present */}
-      <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 w-12 h-12 bg-white/90 rounded-full blur-xs pointer-events-none z-10" />
-
-      {/* Glassmorphic Auth Card for Light Theme */}
-      <div className="relative z-20 w-full max-w-md p-8 sm:p-10 rounded-2xl bg-white/85 backdrop-blur-2xl border border-white/80 shadow-2xl shadow-slate-900/10 glass-card-animate text-gray-900">
-        <div className="mb-6 text-left">
-          <h1 className="text-3xl font-bold text-[#1E3A5F] tracking-tight">Welcome Back</h1>
-          <p className="text-gray-600 text-sm mt-1">Sign in to access your EmotionalVaccine portal</p>
+      {/* Glassmorphic Auth Card with Brand Logo */}
+      <div className="relative z-20 w-full max-w-md p-6 sm:p-8 md:p-10 rounded-2xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-2xl shadow-slate-900/10 glass-card-animate text-gray-900 my-auto">
+        <div className="mb-6 text-center">
+          <img
+            src="/images/logo-badge-transparent.png"
+            alt="Emotional Vaccine - Content Champion Video Selector"
+            className="w-52 sm:w-60 h-auto mx-auto mb-4 object-contain select-none drop-shadow-xs"
+          />
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#1E3A5F] tracking-tight">Welcome Back</h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-1">Sign in to access your EmotionalVaccine portal</p>
         </div>
 
         {/* Pending Approval Banner */}
