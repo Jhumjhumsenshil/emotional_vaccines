@@ -41,6 +41,8 @@ export default function LoginPage() {
       const userRole = data.user?.role;
       if (userRole === 'Super Admin' || userRole === 'Administrator') {
         router.push('/admin');
+      } else if (userRole === 'Report Viewer') {
+        router.push('/report-viewer');
       } else {
         router.push('/dashboard');
       }

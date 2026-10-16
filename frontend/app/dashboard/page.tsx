@@ -236,17 +236,28 @@ export default function DashboardPage() {
               <div
                 style={{
                   padding: '1rem',
-                  border: '1px solid var(--border-color)',
+                  border: '1px solid #bfdbfe',
                   borderRadius: '8px',
-                  background: 'var(--bg-color)',
+                  background: '#eff6ff',
                 }}
               >
-                <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.25rem', color: '#1d4ed8' }}>
                   📊 Analytics & Reports
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '0.8rem', color: '#1e40af', marginBottom: '0.75rem' }}>
                   Access view statistics, user engagement analytics, and report metrics.
                 </div>
+                <Link
+                  href="/report-viewer"
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: 'var(--primary-color)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Go to Reports Dashboard &rarr;
+                </Link>
               </div>
             )}
           </div>

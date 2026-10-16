@@ -43,9 +43,12 @@ export default function Sidebar({
   }, []);
 
   const navItems: NavItem[] = [
-    { name: 'Dashboard', path: '/admin/dashboard' },
+    { name: 'Dashboard', path: '/admin/dashboard', roles: ['Super Admin', 'Administrator'] },
     { name: 'Customers', path: '/admin/customers', roles: ['Super Admin', 'Administrator'] },
-    { name: 'Analytics', path: '/admin/analytics', roles: ['Super Admin', 'Administrator', 'Report Viewer'] },
+    { name: 'Analytics', path: '/admin/analytics', roles: ['Super Admin', 'Administrator'] },
+
+    // Report Viewer role: dedicated reports dashboard
+    { name: 'Reports & Analytics', path: '/report-viewer', roles: ['Report Viewer', 'Super Admin', 'Administrator'] },
     
     {
       name: 'Video Inventory',
