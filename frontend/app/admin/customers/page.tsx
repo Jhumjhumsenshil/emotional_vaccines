@@ -1,48 +1,69 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import AppLayout from '../../components/layout/AppLayout';
 import Modal from '../../components/ui/Modal';
 import { Input, Select, Button } from '../../components/ui/FormComponents';
+import {
+  Organization,
+  CustomerType,
+  getOrganizations,
+  getCustomerMetaMap,
+  saveCustomerMeta,
+} from '../../../services/organizationService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface CustomerItem {
+interface BackendUserItem {
   id: number;
   name: string;
   username: string;
   email: string;
   status: string; // 'pending' | 'approved'
   is_active: boolean;
-  role: string | null;  // treated as "customer group" on this page
+  role: string | null;
   role_id: number | null;
   created_at: string | null;
 }
 
-interface RoleItem {
+export interface CustomerItem {
   id: number;
   name: string;
-  description: string | null;
+  username: string;
+  email: string;
+  status: string; // 'pending' | 'approved'
+  is_active: boolean;
+  role: string | null;
+  role_id: number | null;
+  created_at: string | null;
+  // Organization-based customer properties
+  customerType: CustomerType;
+  organizationId: number | null;
+  organizationName: string | null;
+  phoneNumber: string;
 }
 
-// Customer Management uses "group" terminology for roles.
-// "Unassigned" filter means: approved/active customers with no group yet.
-type SortField = 'name' | 'email' | 'status' | 'role' | 'created_at' | 'id';
+type SortField = 'id' | 'name' | 'email' | 'customerType' | 'organization' | 'created_at' | 'status';
 type SortDir = 'asc' | 'desc';
-type CustomerFilter = 'all' | 'active' | 'pending' | 'unassigned';
+type CustomerFilter = 'all' | 'active' | 'pending' | 'inactive' | 'direct' | 'organization';
 
 interface CustomerFormData {
   name: string;
   email: string;
-  username: string;
-  password: string;
-  role: string;
+  phone: string;
+  customerType: CustomerType;
+  organizationId: string; // ID string for <select>, or empty for direct customer
+  status: 'active' | 'pending' | 'inactive';
+  username?: string;
+  password?: string;
 }
 
 interface FormErrors {
   name?: string;
   email?: string;
+  phone?: string;
+  organizationId?: string;
   username?: string;
   password?: string;
 }
@@ -88,25 +109,66 @@ function avatarColor(name: string): string {
   return colors[idx];
 }
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+// ─── Badges ───────────────────────────────────────────────────────────────────
 
 function StatusBadge({ customer }: { customer: CustomerItem }) {
   const s = getAccountStatus(customer);
   if (s === 'inactive')
     return (
-      <span className="badge badge-deactivated">
+      <span className="badge badge-deactivated" id={`status-badge-${customer.id}`}>
         <span className="badge-dot" /> Inactive
       </span>
     );
   if (s === 'pending')
     return (
-      <span className="badge badge-pending">
+      <span className="badge badge-pending" id={`status-badge-${customer.id}`}>
         <span className="badge-dot" /> Pending
       </span>
     );
   return (
-    <span className="badge badge-approved">
+    <span className="badge badge-approved" id={`status-badge-${customer.id}`}>
       <span className="badge-dot" /> Active
+    </span>
+  );
+}
+
+function CustomerTypeBadge({ type }: { type: CustomerType }) {
+  if (type === 'Direct Customer') {
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.35rem',
+          background: '#eff6ff',
+          color: '#1d4ed8',
+          border: '1px solid #bfdbfe',
+          borderRadius: 9999,
+          padding: '0.2rem 0.65rem',
+          fontSize: '0.75rem',
+          fontWeight: 600,
+        }}
+      >
+        <span style={{ fontSize: '0.8rem' }}>👤</span> Direct Customer
+      </span>
+    );
+  }
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.35rem',
+        background: '#f5f3ff',
+        color: '#6d28d9',
+        border: '1px solid #ddd6fe',
+        borderRadius: 9999,
+        padding: '0.2rem 0.65rem',
+        fontSize: '0.75rem',
+        fontWeight: 600,
+      }}
+    >
+      <span style={{ fontSize: '0.8rem' }}>🏢</span> Organization-Based
     </span>
   );
 }
@@ -154,6 +216,8 @@ function SortIcon({
 // ─── Customer Detail Panel ─────────────────────────────────────────────────────
 
 function CustomerDetailView({ customer }: { customer: CustomerItem }) {
+  const isOrgCustomer = customer.customerType === 'Organization-Based Customer';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Avatar + identity block */}
@@ -173,16 +237,25 @@ function CustomerDetailView({ customer }: { customer: CustomerItem }) {
           {initials(customer.name)}
         </div>
         <div>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-main)' }}>
+          <div style={{ fontWeight: 700, fontSize: '1.15rem', color: 'var(--text-main)' }}>
             {customer.name}
           </div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{customer.email}</div>
-          <div style={{ marginTop: 6 }}>
-            {customer.role ? (
-              <span className="badge badge-role">{customer.role}</span>
-            ) : (
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                No group assigned
+          <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>{customer.email}</div>
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <CustomerTypeBadge type={customer.customerType} />
+            {isOrgCustomer && customer.organizationName && (
+              <span
+                style={{
+                  fontSize: '0.775rem',
+                  color: '#4b5563',
+                  background: '#f3f4f6',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: 6,
+                  fontWeight: 500,
+                  border: '1px solid #e5e7eb',
+                }}
+              >
+                {customer.organizationName}
               </span>
             )}
           </div>
@@ -190,14 +263,22 @@ function CustomerDetailView({ customer }: { customer: CustomerItem }) {
       </div>
 
       {/* Profile detail grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
         {[
           { label: 'Customer ID', value: `#${customer.id}` },
+          { label: 'Customer Type', value: customer.customerType },
+          {
+            label: 'Organization',
+            value: isOrgCustomer ? (customer.organizationName ?? '—') : '— None (Direct Customer)',
+          },
+          { label: 'Phone Number', value: customer.phoneNumber || '—' },
+          { label: 'Email Address', value: customer.email },
           { label: 'Username', value: `@${customer.username}` },
-          { label: 'Email', value: customer.email },
-          { label: 'Customer Group', value: customer.role ?? '— Not Assigned' },
           { label: 'Registration Date', value: formatDate(customer.created_at) },
-          { label: 'Account Status', value: getAccountStatus(customer).charAt(0).toUpperCase() + getAccountStatus(customer).slice(1) },
+          {
+            label: 'Account Status',
+            value: getAccountStatus(customer).charAt(0).toUpperCase() + getAccountStatus(customer).slice(1),
+          },
         ].map(({ label, value }) => (
           <div
             key={label}
@@ -234,7 +315,7 @@ function CustomerDetailView({ customer }: { customer: CustomerItem }) {
         ))}
       </div>
 
-      {/* Note: account access management lives in User Management */}
+      {/* Note regarding user access and role approvals */}
       <div
         style={{
           fontSize: '0.8rem',
@@ -245,7 +326,7 @@ function CustomerDetailView({ customer }: { customer: CustomerItem }) {
           border: '1px solid var(--border-color)',
         }}
       >
-        To approve, deactivate, or change the system role for this account, go to{' '}
+        To manage administrative portal roles (Administrator, Content Manager, Report Viewer), navigate to{' '}
         <Link href="/admin" style={{ color: 'var(--primary-color)', fontWeight: 600 }}>
           User Management &amp; Approvals
         </Link>
@@ -256,13 +337,11 @@ function CustomerDetailView({ customer }: { customer: CustomerItem }) {
 }
 
 // ─── Add / Edit Customer Form ──────────────────────────────────────────────────
-// Note: account status changes (activate/deactivate) belong in User Management.
-// This form handles profile fields + group assignment only.
 
 function CustomerFormPanel({
   form,
   errors,
-  roles,
+  organizations,
   isEdit,
   saving,
   onChange,
@@ -271,24 +350,31 @@ function CustomerFormPanel({
 }: {
   form: CustomerFormData;
   errors: FormErrors;
-  roles: RoleItem[];
+  organizations: Organization[];
   isEdit: boolean;
   saving: boolean;
   onChange: (field: keyof CustomerFormData, value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
 }) {
+  const isOrgCustomer = form.customerType === 'Organization-Based Customer';
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
+        {/* Customer Name */}
         <Input
-          label="Full Name *"
+          id="customer-form-name"
+          label="Customer Name *"
           placeholder="e.g. Jane Smith"
           value={form.name}
           onChange={(e) => onChange('name', e.target.value)}
           error={errors.name}
         />
+
+        {/* Email Address */}
         <Input
+          id="customer-form-email"
           label="Email Address *"
           type="email"
           placeholder="jane@example.com"
@@ -296,55 +382,103 @@ function CustomerFormPanel({
           onChange={(e) => onChange('email', e.target.value)}
           error={errors.email}
         />
+
+        {/* Phone Number */}
         <Input
-          label="Username *"
-          placeholder="janesmith"
-          value={form.username}
-          onChange={(e) => onChange('username', e.target.value)}
-          error={errors.username}
-          disabled={isEdit}
+          id="customer-form-phone"
+          label="Phone Number"
+          placeholder="e.g. +1 (555) 000-0000"
+          value={form.phone}
+          onChange={(e) => onChange('phone', e.target.value)}
+          error={errors.phone}
         />
+
+        {/* Customer Type Dropdown */}
+        <Select
+          id="customer-form-type"
+          label="Customer Type *"
+          value={form.customerType}
+          onChange={(e) => onChange('customerType', e.target.value)}
+        >
+          <option value="Direct Customer">Direct Customer</option>
+          <option value="Organization-Based Customer">Organization-Based Customer</option>
+        </Select>
+
+        {/* Organization Dropdown */}
+        {isOrgCustomer ? (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Select
+              id="customer-form-organization"
+              label="Organization *"
+              value={form.organizationId}
+              onChange={(e) => onChange('organizationId', e.target.value)}
+              error={errors.organizationId}
+            >
+              <option value="">— Select an Organization —</option>
+              {organizations.map((org) => (
+                <option key={org.id} value={org.id.toString()}>
+                  {org.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        ) : (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Select
+              id="customer-form-organization-disabled"
+              label="Organization"
+              value=""
+              disabled
+            >
+              <option value="">None (Direct Customer)</option>
+            </Select>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '-0.75rem', marginBottom: '1rem' }}>
+              Direct customers are individual accounts not linked to any organization.
+            </p>
+          </div>
+        )}
+
+        {/* Account Status */}
+        <Select
+          id="customer-form-status"
+          label="Account Status *"
+          value={form.status}
+          onChange={(e) => onChange('status', e.target.value as 'active' | 'pending' | 'inactive')}
+        >
+          <option value="active">Active</option>
+          <option value="pending">Pending</option>
+          <option value="inactive">Inactive</option>
+        </Select>
+
+        {/* In Add Mode: Password & Optional Username */}
         {!isEdit && (
           <Input
+            id="customer-form-password"
             label="Password *"
             type="password"
             placeholder="Minimum 8 characters"
-            value={form.password}
+            value={form.password || ''}
             onChange={(e) => onChange('password', e.target.value)}
             error={errors.password}
           />
         )}
-        <div style={{ gridColumn: isEdit ? '1 / -1' : 'auto' }}>
-          <Select
-            label="Customer Group (Role)"
-            value={form.role}
-            onChange={(e) => onChange('role', e.target.value)}
-          >
-            <option value="">— No Group —</option>
-            {roles.map((r) => (
-              <option key={r.id} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </Select>
-        </div>
+
+        {/* In Edit Mode: Username (disabled display) */}
+        {isEdit && (
+          <Input
+            id="customer-form-username-disabled"
+            label="Username"
+            value={form.username || ''}
+            disabled
+          />
+        )}
       </div>
 
-      {isEdit && (
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-0.5rem', marginBottom: '1rem' }}>
-          ℹ️ Username cannot be changed. To change account access status, use{' '}
-          <Link href="/admin" style={{ color: 'var(--primary-color)' }}>
-            User Management &amp; Approvals
-          </Link>
-          .
-        </p>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-        <Button variant="secondary" onClick={onCancel} disabled={saving}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+        <Button id="customer-form-cancel-btn" variant="secondary" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={onSubmit} disabled={saving}>
+        <Button id="customer-form-submit-btn" variant="primary" onClick={onSubmit} disabled={saving}>
           {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Customer'}
         </Button>
       </div>
@@ -356,13 +490,13 @@ function CustomerFormPanel({
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
-  const [roles, setRoles] = useState<RoleItem[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Search / Filter / Sort / Pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [customerFilter, setCustomerFilter] = useState<CustomerFilter>('all');
-  const [groupFilter, setGroupFilter] = useState('');
+  const [orgFilter, setOrgFilter] = useState('');
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -371,11 +505,18 @@ export default function CustomersPage() {
   const [viewCustomer, setViewCustomer] = useState<CustomerItem | null>(null);
   const [editCustomer, setEditCustomer] = useState<CustomerItem | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [groupAssignCustomer, setGroupAssignCustomer] = useState<CustomerItem | null>(null);
-  const [groupAssignValue, setGroupAssignValue] = useState('');
 
-  // Form state — no "status" field; access control lives in User Management
-  const emptyForm: CustomerFormData = { name: '', email: '', username: '', password: '', role: '' };
+  // Form state
+  const emptyForm: CustomerFormData = {
+    name: '',
+    email: '',
+    phone: '',
+    customerType: 'Direct Customer',
+    organizationId: '',
+    status: 'active',
+    username: '',
+    password: '',
+  };
   const [form, setForm] = useState<CustomerFormData>(emptyForm);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
@@ -392,14 +533,44 @@ export default function CustomersPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [usersRes, rolesRes] = await Promise.all([fetch('/api/admin/users'), fetch('/api/roles')]);
-      if (usersRes.ok && rolesRes.ok) {
-        const usersData: CustomerItem[] = await usersRes.json();
-        const rolesData: RoleItem[] = await rolesRes.json();
-        setCustomers(usersData);
-        setRoles(rolesData);
+      // 1. Fetch available organizations from organization service
+      const orgList = getOrganizations();
+      setOrganizations(orgList);
+
+      // 2. Fetch users from API
+      const usersRes = await fetch('/api/admin/users');
+      if (usersRes.ok) {
+        const usersData: BackendUserItem[] = await usersRes.json();
+        const metaMap = getCustomerMetaMap();
+
+        // Merge users with their organization metadata
+        const mergedCustomers: CustomerItem[] = usersData.map((u) => {
+          const meta = metaMap[u.id];
+          let cType: CustomerType = meta?.customerType || 'Direct Customer';
+          let orgId = meta?.organizationId ?? null;
+          let orgName = meta?.organizationName ?? null;
+          let phone = meta?.phoneNumber || '';
+
+          // If orgId is present, verify org name from current org list
+          if (orgId) {
+            const matchedOrg = orgList.find((o) => o.id === orgId);
+            if (matchedOrg) {
+              orgName = matchedOrg.name;
+            }
+          }
+
+          return {
+            ...u,
+            customerType: cType,
+            organizationId: cType === 'Organization-Based Customer' ? orgId : null,
+            organizationName: cType === 'Organization-Based Customer' ? orgName : null,
+            phoneNumber: phone,
+          };
+        });
+
+        setCustomers(mergedCustomers);
       } else {
-        showToast('Failed to load customer data', 'error');
+        showToast('Failed to load customer records', 'error');
       }
     } catch {
       showToast('Network error while connecting to server', 'error');
@@ -412,15 +583,13 @@ export default function CustomersPage() {
     fetchData();
   }, [fetchData]);
 
-  // ── Customer-focused Statistics ──
-  // These stats reflect the customer population, not the approval queue.
+  // ── Overview Statistics ──
   const totalCount = customers.length;
   const activeCount = customers.filter((c) => getAccountStatus(c) === 'active').length;
   const pendingCount = customers.filter((c) => getAccountStatus(c) === 'pending').length;
-  // "Assigned" = approved/active and has a group (role)
-  const assignedCount = customers.filter((c) => getAccountStatus(c) === 'active' && !!c.role).length;
-  // "Unassigned" = active but no group
-  const unassignedCount = customers.filter((c) => getAccountStatus(c) === 'active' && !c.role).length;
+  const inactiveCount = customers.filter((c) => getAccountStatus(c) === 'inactive').length;
+  const directCount = customers.filter((c) => c.customerType === 'Direct Customer').length;
+  const orgBasedCount = customers.filter((c) => c.customerType === 'Organization-Based Customer').length;
 
   // ── Filter + Sort + Paginate ──
   const filtered = useMemo(() => {
@@ -432,16 +601,23 @@ export default function CustomersPage() {
         c.email.toLowerCase().includes(q) ||
         c.username.toLowerCase().includes(q) ||
         String(c.id).includes(q) ||
-        (c.role ?? '').toLowerCase().includes(q);
+        c.customerType.toLowerCase().includes(q) ||
+        (c.organizationName ?? '').toLowerCase().includes(q) ||
+        (c.phoneNumber ?? '').toLowerCase().includes(q);
 
       let matchFilter = true;
       if (customerFilter === 'active') matchFilter = getAccountStatus(c) === 'active';
       else if (customerFilter === 'pending') matchFilter = getAccountStatus(c) === 'pending';
-      else if (customerFilter === 'unassigned') matchFilter = getAccountStatus(c) === 'active' && !c.role;
+      else if (customerFilter === 'inactive') matchFilter = getAccountStatus(c) === 'inactive';
+      else if (customerFilter === 'direct') matchFilter = c.customerType === 'Direct Customer';
+      else if (customerFilter === 'organization') matchFilter = c.customerType === 'Organization-Based Customer';
 
-      const matchGroup = !groupFilter || c.role === groupFilter;
+      const matchOrg =
+        !orgFilter ||
+        (orgFilter === 'direct' && c.customerType === 'Direct Customer') ||
+        (c.organizationId?.toString() === orgFilter);
 
-      return matchSearch && matchFilter && matchGroup;
+      return matchSearch && matchFilter && matchOrg;
     });
 
     list = [...list].sort((a, b) => {
@@ -450,8 +626,9 @@ export default function CustomersPage() {
       if (sortField === 'id') { aVal = a.id; bVal = b.id; }
       else if (sortField === 'name') { aVal = a.name.toLowerCase(); bVal = b.name.toLowerCase(); }
       else if (sortField === 'email') { aVal = a.email.toLowerCase(); bVal = b.email.toLowerCase(); }
+      else if (sortField === 'customerType') { aVal = a.customerType; bVal = b.customerType; }
+      else if (sortField === 'organization') { aVal = (a.organizationName ?? '').toLowerCase(); bVal = (b.organizationName ?? '').toLowerCase(); }
       else if (sortField === 'status') { aVal = getAccountStatus(a); bVal = getAccountStatus(b); }
-      else if (sortField === 'role') { aVal = (a.role ?? '').toLowerCase(); bVal = (b.role ?? '').toLowerCase(); }
       else if (sortField === 'created_at') { aVal = a.created_at ?? ''; bVal = b.created_at ?? ''; }
 
       if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
@@ -460,7 +637,7 @@ export default function CustomersPage() {
     });
 
     return list;
-  }, [customers, searchQuery, customerFilter, groupFilter, sortField, sortDir]);
+  }, [customers, searchQuery, customerFilter, orgFilter, sortField, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -471,7 +648,7 @@ export default function CustomersPage() {
     setCurrentPage(1);
   };
 
-  useEffect(() => { setCurrentPage(1); }, [searchQuery, customerFilter, groupFilter]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, customerFilter, orgFilter]);
 
   // ── Form helpers ──
   const openAdd = () => {
@@ -484,27 +661,50 @@ export default function CustomersPage() {
     setForm({
       name: c.name,
       email: c.email,
+      phone: c.phoneNumber || '',
+      customerType: c.customerType,
+      organizationId: c.organizationId ? c.organizationId.toString() : '',
+      status: getAccountStatus(c),
       username: c.username,
       password: '',
-      role: c.role ?? '',
     });
     setFormErrors({});
     setEditCustomer(c);
   };
 
   const updateForm = (field: keyof CustomerFormData, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      // When switching customerType to 'Direct Customer', clear organizationId to 'None'
+      if (field === 'customerType' && value === 'Direct Customer') {
+        next.organizationId = '';
+      }
+      return next;
+    });
     setFormErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
   const validateForm = (isEdit: boolean): boolean => {
     const errs: FormErrors = {};
-    if (!form.name.trim()) errs.name = 'Name is required.';
-    if (!form.email.trim()) errs.email = 'Email is required.';
+    if (!form.name.trim()) errs.name = 'Customer name is required.';
+    if (!form.email.trim()) errs.email = 'Email address is required.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Enter a valid email address.';
-    if (!form.username.trim()) errs.username = 'Username is required.';
-    if (!isEdit && !form.password.trim()) errs.password = 'Password is required.';
-    else if (!isEdit && form.password.length < 8) errs.password = 'Password must be at least 8 characters.';
+
+    // Organization validation: Mandatory for organization-based customers
+    if (form.customerType === 'Organization-Based Customer') {
+      if (!form.organizationId || form.organizationId.trim() === '') {
+        errs.organizationId = 'Please select an organization for organization-based customers.';
+      }
+    }
+
+    if (!isEdit) {
+      if (!form.password || !form.password.trim()) {
+        errs.password = 'Password is required.';
+      } else if (form.password.length < 8) {
+        errs.password = 'Password must be at least 8 characters.';
+      }
+    }
+
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -514,13 +714,14 @@ export default function CustomersPage() {
     if (!validateForm(false)) return;
     setSaving(true);
     try {
+      const desiredUsername = form.username?.trim() || form.email.split('@')[0].trim();
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name.trim(),
           email: form.email.trim(),
-          username: form.username.trim(),
+          username: desiredUsername,
           password: form.password,
         }),
       });
@@ -529,16 +730,30 @@ export default function CustomersPage() {
 
       const newUserId: number = data.user?.id;
 
-      // Assign a group (role) if one was selected
-      if (form.role && newUserId) {
-        await fetch(`/api/admin/users/${newUserId}/role`, {
+      // Update account status if specified
+      if (newUserId && form.status !== 'pending') {
+        await fetch(`/api/admin/users/${newUserId}/status`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role_name: form.role }),
+          body: JSON.stringify({
+            is_active: form.status === 'active',
+            status: form.status === 'active' ? 'approved' : 'pending',
+          }),
         });
       }
 
-      showToast(`Customer "${form.name}" was added. Approve their account in User Management.`);
+      // Persist customer organization metadata
+      const selectedOrg = organizations.find((o) => o.id === Number(form.organizationId));
+      saveCustomerMeta({
+        customerId: newUserId,
+        customerType: form.customerType,
+        organizationId: form.customerType === 'Organization-Based Customer' ? Number(form.organizationId) : null,
+        organizationName: form.customerType === 'Organization-Based Customer' ? (selectedOrg?.name ?? null) : null,
+        phoneNumber: form.phone.trim(),
+        accountStatus: form.status,
+      });
+
+      showToast(`Customer "${form.name}" was successfully added.`);
       setShowAddModal(false);
       fetchData();
     } catch (err: unknown) {
@@ -548,63 +763,63 @@ export default function CustomersPage() {
     }
   };
 
-  // ── Edit Customer (group/profile only) ──
+  // ── Edit Customer ──
   const handleEditCustomer = async () => {
     if (!editCustomer || !validateForm(true)) return;
     setSaving(true);
     try {
       const id = editCustomer.id;
 
-      if (form.role) {
-        const roleRes = await fetch(`/api/admin/users/${id}/role`, {
+      // Update status if changed
+      const currentStatus = getAccountStatus(editCustomer);
+      if (currentStatus !== form.status) {
+        await fetch(`/api/admin/users/${id}/status`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role_name: form.role }),
+          body: JSON.stringify({
+            is_active: form.status !== 'inactive',
+            status: form.status === 'active' ? 'approved' : 'pending',
+          }),
         });
-        if (!roleRes.ok) {
-          const d = await roleRes.json();
-          throw new Error(d.detail || 'Failed to update group');
-        }
       }
 
-      showToast(`Customer "${form.name}" was updated.`);
-      setEditCustomer(null);
-      setCustomers((prev) =>
-        prev.map((c) =>
-          c.id === id ? { ...c, role: form.role || null } : c
-        )
-      );
-    } catch (err: unknown) {
-      showToast((err as Error).message || 'Failed to update customer.', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
+      // Save updated organization and profile metadata
+      const selectedOrg = organizations.find((o) => o.id === Number(form.organizationId));
+      const orgId = form.customerType === 'Organization-Based Customer' ? Number(form.organizationId) : null;
+      const orgName = form.customerType === 'Organization-Based Customer' ? (selectedOrg?.name ?? null) : null;
 
-  // ── Assign Group ──
-  const handleAssignGroup = async () => {
-    if (!groupAssignCustomer) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/admin/users/${groupAssignCustomer.id}/role`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role_name: groupAssignValue }),
+      saveCustomerMeta({
+        customerId: id,
+        customerType: form.customerType,
+        organizationId: orgId,
+        organizationName: orgName,
+        phoneNumber: form.phone.trim(),
+        accountStatus: form.status,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to assign group');
 
-      showToast(`Group "${groupAssignValue}" assigned to ${groupAssignCustomer.name}.`);
+      // Update local state immediately
       setCustomers((prev) =>
         prev.map((c) =>
-          c.id === groupAssignCustomer.id
-            ? { ...c, role: groupAssignValue, status: 'approved' }
+          c.id === id
+            ? {
+                ...c,
+                name: form.name.trim(),
+                email: form.email.trim(),
+                phoneNumber: form.phone.trim(),
+                customerType: form.customerType,
+                organizationId: orgId,
+                organizationName: orgName,
+                is_active: form.status !== 'inactive',
+                status: form.status === 'active' ? 'approved' : 'pending',
+              }
             : c
         )
       );
-      setGroupAssignCustomer(null);
+
+      showToast(`Customer "${form.name}" was successfully updated.`);
+      setEditCustomer(null);
     } catch (err: unknown) {
-      showToast((err as Error).message, 'error');
+      showToast((err as Error).message || 'Failed to update customer.', 'error');
     } finally {
       setSaving(false);
     }
@@ -621,12 +836,7 @@ export default function CustomersPage() {
           <div className="admin-title-area">
             <h1>Customer Management</h1>
             <p>
-              Manage customer profiles, group assignments, and video library access.
-              For account approvals and role assignments, use{' '}
-              <Link href="/admin" style={{ color: 'var(--primary-color)', fontWeight: 600 }}>
-                User Management &amp; Approvals
-              </Link>
-              .
+              Manage direct and organization-linked customer accounts, organizational affiliations, and profile details.
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -653,11 +863,9 @@ export default function CustomersPage() {
           </div>
         </div>
 
-        {/* ── Customer-focused Overview Stats ──
-            These reflect customer population, not the approval queue.
-            Approval counts are in User Management & Approvals. ── */}
+        {/* ── Summary Stats ── */}
         <div className="stats-grid">
-          <div className="stat-card">
+          <div className="stat-card" id="stat-total-customers">
             <div className="stat-info">
               <div className="stat-label">Total Customers</div>
               <div className="stat-value">{loading ? '—' : totalCount}</div>
@@ -665,9 +873,9 @@ export default function CustomersPage() {
             <div className="stat-icon icon-blue">👥</div>
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card" id="stat-active-customers">
             <div className="stat-info">
-              <div className="stat-label">Active</div>
+              <div className="stat-label">Active Customers</div>
               <div
                 className="stat-value"
                 style={{ color: activeCount > 0 ? '#047857' : 'var(--text-main)' }}
@@ -678,38 +886,35 @@ export default function CustomersPage() {
             <div className="stat-icon icon-emerald">✓</div>
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card" id="stat-direct-customers">
             <div className="stat-info">
-              <div className="stat-label">Assigned to Group</div>
-              <div className="stat-value">{loading ? '—' : assignedCount}</div>
-            </div>
-            <div className="stat-icon" style={{ background: '#f5f3ff', color: '#7c3aed', width: 44, height: 44, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>🏷️</div>
-          </div>
-
-          <div
-            className="stat-card"
-            style={{
-              borderColor: unassignedCount > 0 ? '#fde68a' : 'var(--border-color)',
-              backgroundColor: unassignedCount > 0 ? '#fffef7' : 'var(--card-bg)',
-            }}
-          >
-            <div className="stat-info">
-              <div className="stat-label">Unassigned</div>
-              <div
-                className="stat-value"
-                style={{ color: unassignedCount > 0 ? '#d97706' : 'var(--text-main)' }}
-              >
-                {loading ? '—' : unassignedCount}
+              <div className="stat-label">Direct Customers</div>
+              <div className="stat-value" style={{ color: '#2563eb' }}>
+                {loading ? '—' : directCount}
               </div>
             </div>
-            <div className="stat-icon icon-amber">⚠</div>
+            <div className="stat-icon" style={{ background: '#eff6ff', color: '#2563eb', width: 44, height: 44, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+              👤
+            </div>
+          </div>
+
+          <div className="stat-card" id="stat-org-customers">
+            <div className="stat-info">
+              <div className="stat-label">Organization Customers</div>
+              <div className="stat-value" style={{ color: '#7c3aed' }}>
+                {loading ? '—' : orgBasedCount}
+              </div>
+            </div>
+            <div className="stat-icon" style={{ background: '#f5f3ff', color: '#7c3aed', width: 44, height: 44, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+              🏢
+            </div>
           </div>
         </div>
 
         {/* ── Filter & Search Bar ── */}
         <div className="filter-bar" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
           {/* Search */}
-          <div className="search-box" style={{ minWidth: 200, flex: 1 }}>
+          <div className="search-box" style={{ minWidth: 220, flex: 1 }}>
             <svg
               className="search-icon-svg"
               width="16"
@@ -728,17 +933,17 @@ export default function CustomersPage() {
               id="customer-search"
               type="text"
               className="search-input"
-              placeholder="Search by name, email, username, ID, or group…"
+              placeholder="Search by name, email, ID, organization, or phone…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          {/* Group filter */}
+          {/* Organization filter */}
           <select
-            id="customer-group-filter"
-            value={groupFilter}
-            onChange={(e) => setGroupFilter(e.target.value)}
+            id="customer-org-filter"
+            value={orgFilter}
+            onChange={(e) => setOrgFilter(e.target.value)}
             style={{
               padding: '0.6rem 0.75rem',
               fontSize: '0.875rem',
@@ -746,26 +951,28 @@ export default function CustomersPage() {
               borderRadius: 6,
               background: '#fff',
               color: 'var(--text-main)',
-              minWidth: 160,
+              minWidth: 180,
               outline: 'none',
             }}
           >
-            <option value="">All Groups</option>
-            {roles.map((r) => (
-              <option key={r.id} value={r.name}>
-                {r.name}
+            <option value="">All Organizations</option>
+            <option value="direct">Direct Customers Only</option>
+            {organizations.map((org) => (
+              <option key={org.id} value={org.id.toString()}>
+                {org.name}
               </option>
             ))}
           </select>
 
-          {/* Customer-centric filter tabs */}
+          {/* Customer type and status filter tabs */}
           <div className="tab-pills">
             {(
               [
                 { key: 'all', label: `All (${totalCount})` },
+                { key: 'direct', label: `Direct (${directCount})` },
+                { key: 'organization', label: `Org-Based (${orgBasedCount})` },
                 { key: 'active', label: `Active (${activeCount})` },
                 { key: 'pending', label: `Pending (${pendingCount})` },
-                { key: 'unassigned', label: `Unassigned (${unassignedCount})` },
               ] as { key: CustomerFilter; label: string }[]
             ).map(({ key, label }) => (
               <button
@@ -785,7 +992,7 @@ export default function CustomersPage() {
           {loading ? (
             <div style={{ padding: '3.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>⏳</div>
-              Loading customers…
+              Loading customer records…
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -796,7 +1003,7 @@ export default function CustomersPage() {
                 No customers found
               </div>
               <div style={{ fontSize: '0.875rem' }}>
-                {searchQuery || customerFilter !== 'all' || groupFilter
+                {searchQuery || customerFilter !== 'all' || orgFilter
                   ? 'Try adjusting your search or filter criteria.'
                   : 'No customers are registered yet. Click "+ Add Customer" to get started.'}
               </div>
@@ -804,21 +1011,23 @@ export default function CustomersPage() {
           ) : (
             <>
               <div className="table-responsive">
-                <table className="admin-table">
+                <table className="admin-table" id="customer-table">
                   <thead>
                     <tr>
                       {(
                         [
-                          { key: 'id', label: 'ID' },
-                          { key: 'name', label: 'Customer' },
+                          { key: 'id', label: 'Customer ID' },
+                          { key: 'name', label: 'Customer Name' },
                           { key: 'email', label: 'Email' },
-                          { key: 'role', label: 'Group' },
-                          { key: 'created_at', label: 'Registered' },
-                          { key: 'status', label: 'Status' },
+                          { key: 'customerType', label: 'Customer Type' },
+                          { key: 'organization', label: 'Organization' },
+                          { key: 'created_at', label: 'Registration Date' },
+                          { key: 'status', label: 'Account Status' },
                         ] as { key: SortField; label: string }[]
                       ).map(({ key, label }) => (
                         <th
                           key={key}
+                          id={`col-${key}`}
                           style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
                           onClick={() => handleSort(key)}
                         >
@@ -828,128 +1037,125 @@ export default function CustomersPage() {
                           </span>
                         </th>
                       ))}
-                      {/* Actions column — no Deactivate here; that belongs in User Management */}
                       <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paged.map((c) => (
-                      <tr key={c.id}>
-                        {/* ID */}
-                        <td
-                          style={{
-                            color: 'var(--text-muted)',
-                            fontSize: '0.8rem',
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          #{c.id}
-                        </td>
+                    {paged.map((c) => {
+                      const isDirect = c.customerType === 'Direct Customer';
+                      return (
+                        <tr key={c.id} id={`customer-row-${c.id}`}>
+                          {/* Customer ID */}
+                          <td
+                            style={{
+                              color: 'var(--text-muted)',
+                              fontSize: '0.8rem',
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            #{c.id}
+                          </td>
 
-                        {/* Customer Name */}
-                        <td>
-                          <div className="user-cell">
-                            <div
-                              className="user-avatar"
-                              style={{ background: avatarColor(c.name) }}
-                            >
-                              {initials(c.name)}
+                          {/* Customer Name */}
+                          <td>
+                            <div className="user-cell">
+                              <div
+                                className="user-avatar"
+                                style={{ background: avatarColor(c.name) }}
+                              >
+                                {initials(c.name)}
+                              </div>
+                              <div>
+                                <div className="user-info-name">{c.name}</div>
+                                {c.phoneNumber && (
+                                  <div className="user-info-sub" style={{ fontSize: '0.75rem' }}>
+                                    {c.phoneNumber}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <div>
-                              <div className="user-info-name">{c.name}</div>
-                              <div className="user-info-sub">@{c.username}</div>
+                          </td>
+
+                          {/* Email */}
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>
+                            {c.email}
+                          </td>
+
+                          {/* Customer Type */}
+                          <td id={`customer-type-${c.id}`}>
+                            <CustomerTypeBadge type={c.customerType} />
+                          </td>
+
+                          {/* Organization */}
+                          <td id={`customer-org-${c.id}`}>
+                            {isDirect ? (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  color: '#374151',
+                                  fontSize: '0.85rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                }}
+                              >
+                                🏢 {c.organizationName || 'Assigned'}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Registration Date */}
+                          <td
+                            style={{
+                              fontSize: '0.825rem',
+                              color: 'var(--text-muted)',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {formatDate(c.created_at)}
+                          </td>
+
+                          {/* Account Status */}
+                          <td>
+                            <StatusBadge customer={c} />
+                          </td>
+
+                          {/* Actions */}
+                          <td>
+                            <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
+                              <button
+                                id={`view-btn-${c.id}`}
+                                className="btn-sm"
+                                title="View customer profile"
+                                onClick={() => setViewCustomer(c)}
+                                style={{
+                                  background: '#eff6ff',
+                                  color: '#2563eb',
+                                  border: '1px solid #bfdbfe',
+                                }}
+                              >
+                                View
+                              </button>
+                              <button
+                                id={`edit-btn-${c.id}`}
+                                className="btn-sm"
+                                title="Edit customer profile"
+                                onClick={() => openEdit(c)}
+                                style={{
+                                  background: 'var(--card-bg)',
+                                  border: '1px solid var(--border-color)',
+                                  color: 'var(--text-main)',
+                                }}
+                              >
+                                Edit
+                              </button>
                             </div>
-                          </div>
-                        </td>
-
-                        {/* Email */}
-                        <td style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>
-                          {c.email}
-                        </td>
-
-                        {/* Group — the customer-facing concept */}
-                        <td>
-                          {c.role ? (
-                            <span className="badge badge-role">{c.role}</span>
-                          ) : (
-                            <span
-                              style={{
-                                color: 'var(--text-muted)',
-                                fontSize: '0.8rem',
-                                fontStyle: 'italic',
-                              }}
-                            >
-                              Unassigned
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Registered */}
-                        <td
-                          style={{
-                            fontSize: '0.825rem',
-                            color: 'var(--text-muted)',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {formatDate(c.created_at)}
-                        </td>
-
-                        {/* Status */}
-                        <td>
-                          <StatusBadge customer={c} />
-                        </td>
-
-                        {/* Actions — View / Edit profile / Assign Group only.
-                            Account access (deactivate/activate/approve) is in User Management. */}
-                        <td>
-                          <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
-                            <button
-                              id={`view-btn-${c.id}`}
-                              className="btn-sm"
-                              title="View customer profile"
-                              onClick={() => setViewCustomer(c)}
-                              style={{
-                                background: '#eff6ff',
-                                color: '#2563eb',
-                                border: '1px solid #bfdbfe',
-                              }}
-                            >
-                              View
-                            </button>
-                            <button
-                              id={`edit-btn-${c.id}`}
-                              className="btn-sm"
-                              title="Edit customer profile"
-                              onClick={() => openEdit(c)}
-                              style={{
-                                background: 'var(--card-bg)',
-                                border: '1px solid var(--border-color)',
-                                color: 'var(--text-main)',
-                              }}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              id={`group-btn-${c.id}`}
-                              className="btn-sm"
-                              title="Assign to customer group"
-                              onClick={() => {
-                                setGroupAssignCustomer(c);
-                                setGroupAssignValue(c.role ?? '');
-                              }}
-                              style={{
-                                background: '#f5f3ff',
-                                color: '#7c3aed',
-                                border: '1px solid #ddd6fe',
-                              }}
-                            >
-                              Group
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1066,63 +1272,6 @@ export default function CustomersPage() {
           )}
         </div>
 
-        {/* ── Video Library / Cohort Assignment ──────────────────────────────
-            Placeholder for future feature: assign video libraries to customer
-            cohorts (groups). This section will expand when the content module
-            is connected to the customer group model. ── */}
-        <div
-          style={{
-            marginTop: '1.5rem',
-            background: 'var(--card-bg)',
-            border: '1px dashed var(--border-color)',
-            borderRadius: 12,
-            padding: '1.5rem',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '1.25rem' }}>🎬</span>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>
-                Video Library Assignment
-              </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Coming soon — assign specific video libraries to customer groups (cohorts).
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {roles.length > 0 ? (
-              roles.map((r) => (
-                <div
-                  key={r.id}
-                  style={{
-                    background: '#f5f3ff',
-                    border: '1px solid #ddd6fe',
-                    borderRadius: 8,
-                    padding: '0.5rem 0.875rem',
-                    fontSize: '0.8rem',
-                    color: '#7c3aed',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                  }}
-                >
-                  <span>🏷️</span>
-                  {r.name}
-                  <span style={{ color: '#a78bfa', fontWeight: 400, marginLeft: 4 }}>
-                    — {customers.filter((c) => c.role === r.name).length} customers
-                  </span>
-                </div>
-              ))
-            ) : (
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                No groups configured yet.
-              </span>
-            )}
-          </div>
-        </div>
-
       </div>
 
       {/* ════ MODALS ════ */}
@@ -1134,7 +1283,7 @@ export default function CustomersPage() {
         title="Customer Profile"
         maxWidth="max-w-lg"
         footer={
-          <Button variant="secondary" onClick={() => setViewCustomer(null)}>
+          <Button id="close-view-customer-btn" variant="secondary" onClick={() => setViewCustomer(null)}>
             Close
           </Button>
         }
@@ -1152,7 +1301,7 @@ export default function CustomersPage() {
         <CustomerFormPanel
           form={form}
           errors={formErrors}
-          roles={roles}
+          organizations={organizations}
           isEdit={false}
           saving={saving}
           onChange={updateForm}
@@ -1165,76 +1314,19 @@ export default function CustomersPage() {
       <Modal
         isOpen={!!editCustomer}
         onClose={() => setEditCustomer(null)}
-        title={`Edit Profile — ${editCustomer?.name ?? ''}`}
+        title={`Edit Customer — ${editCustomer?.name ?? ''}`}
         maxWidth="max-w-2xl"
       >
         <CustomerFormPanel
           form={form}
           errors={formErrors}
-          roles={roles}
+          organizations={organizations}
           isEdit={true}
           saving={saving}
           onChange={updateForm}
           onSubmit={handleEditCustomer}
           onCancel={() => setEditCustomer(null)}
         />
-      </Modal>
-
-      {/* Assign Group */}
-      <Modal
-        isOpen={!!groupAssignCustomer}
-        onClose={() => setGroupAssignCustomer(null)}
-        title={`Assign Group — ${groupAssignCustomer?.name ?? ''}`}
-        maxWidth="max-w-sm"
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => setGroupAssignCustomer(null)}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleAssignGroup}
-              disabled={saving || !groupAssignValue}
-            >
-              {saving ? 'Saving…' : 'Assign Group'}
-            </Button>
-          </>
-        }
-      >
-        <div>
-          <p
-            style={{
-              fontSize: '0.875rem',
-              color: 'var(--text-muted)',
-              marginBottom: '1rem',
-              lineHeight: 1.5,
-            }}
-          >
-            Select a customer group for <strong>{groupAssignCustomer?.name}</strong>. This will
-            also approve the account if it is currently pending.
-          </p>
-          <Select
-            label="Customer Group"
-            value={groupAssignValue}
-            onChange={(e) => setGroupAssignValue(e.target.value)}
-          >
-            <option value="">— Select a group —</option>
-            {roles.map((r) => (
-              <option key={r.id} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </Select>
-          {groupAssignCustomer?.role && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-0.5rem' }}>
-              Currently assigned to: <strong>{groupAssignCustomer.role}</strong>
-            </p>
-          )}
-        </div>
       </Modal>
 
       {/* Toast Notification */}
