@@ -5,6 +5,10 @@ export interface Organization {
   logo_url?: string;
   is_active: boolean;
   created_at?: string;
+  // projectCount is a mock field — no backend /api/projects endpoint exists yet.
+  // The schema defines projects(org_id) but the API is unimplemented.
+  // Replace with real API data when /api/organizations returns project counts.
+  projectCount?: number;
 }
 
 export type CustomerType = 'Direct Customer' | 'Organization-Based Customer';
@@ -18,13 +22,17 @@ export interface CustomerOrganizationMeta {
   accountStatus?: 'active' | 'pending' | 'inactive';
 }
 
+// NOTE: projectCount values below are mock data.
+// The backend schema has a projects table with org_id FK, but no API endpoint
+// (e.g. /api/organizations or /api/projects) currently exposes project counts.
+// When that API is implemented, remove projectCount from this seed and fetch live counts.
 export const INITIAL_ORGANIZATIONS: Organization[] = [
-  { id: 1, name: 'Acme Health Systems', slug: 'acme-health', is_active: true, created_at: '2026-01-15T09:00:00Z' },
-  { id: 2, name: 'Beacon Mental Health Group', slug: 'beacon-mental-health', is_active: true, created_at: '2026-02-10T11:30:00Z' },
-  { id: 3, name: 'CareFirst Wellness Network', slug: 'carefirst-wellness', is_active: true, created_at: '2026-03-01T14:15:00Z' },
-  { id: 4, name: 'Horizon Behavioral Health', slug: 'horizon-behavioral', is_active: true, created_at: '2026-03-22T08:45:00Z' },
-  { id: 5, name: 'Metro General Healthcare', slug: 'metro-general', is_active: true, created_at: '2026-04-05T10:20:00Z' },
-  { id: 6, name: 'St. Jude Wellness Foundation', slug: 'st-jude-wellness', is_active: true, created_at: '2026-05-18T16:00:00Z' },
+  { id: 1, name: 'Acme Health Systems',         slug: 'acme-health',         is_active: true,  created_at: '2026-01-15T09:00:00Z', projectCount: 4 },
+  { id: 2, name: 'Beacon Mental Health Group',   slug: 'beacon-mental-health',is_active: true,  created_at: '2026-02-10T11:30:00Z', projectCount: 2 },
+  { id: 3, name: 'CareFirst Wellness Network',   slug: 'carefirst-wellness',  is_active: true,  created_at: '2026-03-01T14:15:00Z', projectCount: 3 },
+  { id: 4, name: 'Horizon Behavioral Health',    slug: 'horizon-behavioral',  is_active: true,  created_at: '2026-03-22T08:45:00Z', projectCount: 1 },
+  { id: 5, name: 'Metro General Healthcare',     slug: 'metro-general',       is_active: true,  created_at: '2026-04-05T10:20:00Z', projectCount: 5 },
+  { id: 6, name: 'St. Jude Wellness Foundation', slug: 'st-jude-wellness',    is_active: false, created_at: '2026-05-18T16:00:00Z', projectCount: 0 },
 ];
 
 const ORGS_STORAGE_KEY = 'mock_organizations';

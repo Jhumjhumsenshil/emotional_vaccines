@@ -59,7 +59,7 @@ export default function Sidebar({
       ],
     },
     
-    { name: 'Organization', path: '/admin', roles: ['Super Admin', 'Administrator'] },
+    { name: 'Organization', path: '/admin/organization', roles: ['Super Admin', 'Administrator'] },
 
     {
       name: 'Administration',
