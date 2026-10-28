@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import AppLayout from '../../components/layout/AppLayout';
 import Modal from '../../components/ui/Modal';
 import { Input, Select, Button } from '../../components/ui/FormComponents';
@@ -225,7 +225,7 @@ function OrgDetailView({ org }: { org: OrgWithCounts }) {
           { label: 'Projects (Mock)', value: String(org.projectCount) },
           { label: 'Status', value: org.is_active ? 'Active' : 'Inactive' },
           { label: 'Created On', value: formatDate(org.created_at) },
-          { label: 'Logo URL', value: org.logo_url || '— None set' },
+          { label: 'Logo', value: org.logo_url ? 'Custom logo uploaded' : '— None set' },
         ].map(({ label, value }) => (
           <div key={label} style={{
             background: '#f9fafb', borderRadius: 8,
@@ -259,41 +259,172 @@ function OrgDetailView({ org }: { org: OrgWithCounts }) {
 
 // ─── Organization Form ────────────────────────────────────────────────────────
 
-function OrgLogoPreview({ url }: { url: string }) {
-  const [broken, setBroken] = useState(false);
+function OrgLogoUpload({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (dataUrl: string) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Reset broken state whenever the URL changes
-  useEffect(() => { setBroken(false); }, [url]);
+  function processFile(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (typeof result === 'string') onChange(result);
+    };
+    reader.readAsDataURL(file);
+  }
 
-  if (!url.trim()) return null;
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  }
+
+  const hasLogo = !!value;
 
   return (
-    <div style={{
-      marginTop: '-0.5rem', marginBottom: '1rem',
-      display: 'flex', alignItems: 'center', gap: '0.75rem',
-      padding: '0.6rem 0.875rem',
-      background: '#f9fafb', border: '1px solid var(--border-color)',
-      borderRadius: 8,
-    }}>
-      <div style={{
-        width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
-        background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '0.7rem', color: '#9ca3af', fontWeight: 600,
-      }}>
-        {broken
-          ? <span style={{ fontSize: '1.25rem' }}>🖼️</span>
-          : <img
-              src={url}
-              alt="Logo preview"
-              style={{ width: 40, height: 40, objectFit: 'cover' }}
-              onError={() => setBroken(true)}
-            />}
+    <div style={{ gridColumn: '1 / -1', marginBottom: '1rem' }}>
+      {/* Label + hint */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.4rem' }}>
+        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>
+          Organization Logo
+        </label>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          Recommended: 200 x 200 px &middot; PNG, JPEG, JPG or SVG &middot; max 2 MB
+        </span>
       </div>
-      <div style={{ fontSize: '0.775rem', color: broken ? '#b91c1c' : 'var(--text-muted)' }}>
-        {broken
-          ? '⚠️ Could not load logo from this URL. It will still be saved but may not display.'
-          : 'Logo preview'}
+
+      {/* Drop zone */}
+      <div
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          padding: '0.875rem 1rem',
+          border: `2px dashed ${dragging ? 'var(--primary-color)' : 'var(--border-color)'}`,
+          borderRadius: 10,
+          background: dragging ? 'rgba(99,102,241,0.05)' : '#f9fafb',
+          cursor: 'pointer',
+          transition: 'border-color 0.2s, background 0.2s',
+          userSelect: 'none',
+        }}
+      >
+        {/* Thumbnail */}
+        <div style={{
+          width: 56, height: 56, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+          background: '#e5e7eb', border: '1px solid var(--border-color)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {hasLogo
+            ? <img src={value} alt="Logo thumbnail" style={{ width: 56, height: 56, objectFit: 'cover' }} />
+            : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="M21 15l-5-5L5 21" />
+              </svg>
+          }
+        </div>
+
+        {/* Instructions */}
+        <div style={{ flex: 1 }}>
+          {hasLogo ? (
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: 600 }}>
+              Logo uploaded
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}>Click to browse</span>
+              {' '}or drag and drop an image here
+            </div>
+          )}
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>
+            {hasLogo ? 'Click anywhere here to replace the current logo' : 'PNG, JPEG, JPG, SVG — max 2 MB'}
+          </div>
+        </div>
+
+        {/* Preview button */}
+        {hasLogo && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowPreview(true); }}
+            style={{
+              background: 'var(--primary-color, #6366f1)', color: '#fff', border: 'none',
+              borderRadius: 6, padding: '0.3rem 0.75rem',
+              fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+              flexShrink: 0, letterSpacing: '0.01em',
+            }}
+          >
+            Preview
+          </button>
+        )}
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={inputRef}
+        id="org-form-logo"
+        type="file"
+        accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
+      {/* Lightbox preview overlay */}
+      {showPreview && (
+        <div
+          onClick={() => setShowPreview(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 14, padding: '1.5rem',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
+              maxWidth: '90vw',
+            }}
+          >
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Logo Preview</div>
+            <img
+              src={value}
+              alt="Logo full preview"
+              style={{ maxWidth: 320, maxHeight: 320, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border-color)' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPreview(false)}
+              style={{
+                background: '#f3f4f6', color: 'var(--text-main)', border: 'none',
+                borderRadius: 6, padding: '0.4rem 1.2rem',
+                fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -332,18 +463,13 @@ function OrgFormPanel({
           error={errors.slug}
         />
 
-        <Input
-          id="org-form-logo"
-          label="Logo URL"
-          placeholder="https://example.com/logo.png"
-          value={form.logo_url}
-          onChange={(e) => onChange('logo_url', e.target.value)}
-          type="url"
-        />
       </div>
 
-      {/* Live logo preview — appears below the Logo URL field */}
-      <OrgLogoPreview url={form.logo_url} />
+      {/* Logo upload with inline preview */}
+      <OrgLogoUpload
+        value={form.logo_url}
+        onChange={(dataUrl) => onChange('logo_url', dataUrl)}
+      />
 
       <div style={{ marginBottom: '1rem' }}>
         <Select
