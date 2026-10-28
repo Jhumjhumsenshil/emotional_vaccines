@@ -32,6 +32,7 @@ interface OrgWithCounts extends Organization {
 
 interface OrgFormData {
   name: string;
+  description: string;
   slug: string;
   logo_url: string;
   is_active: boolean;
@@ -322,7 +323,43 @@ function OrgFormPanel({
             error={errors.name}
           />
         </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+            <label htmlFor="org-form-description" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main, #334155)' }}>
+              Description
+            </label>
+            <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted, #94a3b8)' }}>
+              {form.description.length} / 250
+            </span>
+          </div>
 
+          <textarea
+            id="org-form-description"
+            name="description"
+            rows={3}
+            maxLength={250}
+            placeholder="Provide a brief summary of the organization's mission or operations..."
+            style={{
+              width: '100%',
+              padding: '0.625rem 0.875rem',
+              backgroundColor: '#ffffff',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              borderRadius: '0.5rem',
+              fontSize: '0.875rem',
+              color: 'var(--text-main, #1e293b)',
+              resize: 'vertical',
+              minHeight: '80px',
+              maxHeight: '200px',
+              outline: 'none',
+              fontFamily: 'inherit',
+              boxSizing: 'border-box'
+            }}
+            value={form.description}
+            onChange={(e) => onChange('description', e.target.value)}
+          />          
+          </div>
+           
+         
         <Input
           id="org-form-slug"
           label="Slug *"
@@ -340,7 +377,8 @@ function OrgFormPanel({
           onChange={(e) => onChange('logo_url', e.target.value)}
           type="url"
         />
-      </div>
+        
+     </div>
 
       {/* Live logo preview — appears below the Logo URL field */}
       <OrgLogoPreview url={form.logo_url} />
@@ -391,7 +429,7 @@ export default function OrganizationPage() {
   const [toggleOrg, setToggleOrg] = useState<OrgWithCounts | null>(null);
 
   // Form
-  const emptyForm: OrgFormData = { name: '', slug: '', logo_url: '', is_active: true };
+  const emptyForm: OrgFormData = { name: '', description: '', slug: '', logo_url: '', is_active: true };
   const [form, setForm]         = useState<OrgFormData>(emptyForm);
   const [formErrors, setFormErrors] = useState<OrgFormErrors>({});
   const [saving, setSaving]     = useState(false);
@@ -404,29 +442,45 @@ export default function OrganizationPage() {
   }, []);
 
   // ── Load data ──
-  const loadOrgs = useCallback(() => {
-    setLoading(true);
-    const raw = getOrganizations();
-    const metaMap = getCustomerMetaMap();
+// ── Load data ──
+const loadOrgs = useCallback(async () => {
+  setLoading(true);
+  try {
+    // 1. Fetch real organization data from your FastAPI backend
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+    const response = await fetch(`${API_BASE_URL}/organizations`);
 
-    // Count customers per org by scanning metadata
+    if (!response.ok) {
+      throw new Error(`Failed to fetch organizations (Status: ${response.status})`);
+    }
+
+    const raw: Organization[] = await response.json();
+
+    // 2. Map customer metadata (if still using customer metadata service)
+    const metaMap = getCustomerMetaMap();
     const customerCounts: Record<number, number> = {};
+    
     Object.values(metaMap).forEach((meta) => {
       if (meta.organizationId) {
         customerCounts[meta.organizationId] = (customerCounts[meta.organizationId] || 0) + 1;
       }
     });
 
-    // projectCount: read from the Organization record (seeded as mock data).
-    // No backend /api/projects or /api/organizations endpoint returns project counts yet.
-    // When the API is available, replace `o.projectCount ?? 0` with the fetched value.
-    setOrgs(raw.map((o) => ({
-      ...o,
-      customerCount: customerCounts[o.id] ?? 0,
-      projectCount: o.projectCount ?? 0,
-    })));
+    // 3. Format state with customer & project counts
+    setOrgs(
+      raw.map((o) => ({
+        ...o,
+        customerCount: customerCounts[o.id] ?? 0,
+        projectCount: o.projectCount ?? 0,
+      }))
+    );
+  } catch (error) {
+    console.error('Error fetching organizations:', error);
+    showToast('Failed to load organizations from server', 'error');
+  } finally {
     setLoading(false);
-  }, []);
+  }
+}, [showToast]);
 
   useEffect(() => { loadOrgs(); }, [loadOrgs]);
 
@@ -491,7 +545,7 @@ export default function OrganizationPage() {
   };
 
   const openEdit = (o: OrgWithCounts) => {
-    setForm({ name: o.name, slug: o.slug, logo_url: o.logo_url ?? '', is_active: o.is_active });
+    setForm({ name: o.name, description: o.description ?? '', slug: o.slug, logo_url: o.logo_url ?? '', is_active: o.is_active });
     setFormErrors({});
     setEditOrg(o);
   };
@@ -533,69 +587,138 @@ export default function OrganizationPage() {
   };
 
   // ── Add Organization ──
-  const handleAdd = () => {
-    if (!validateForm(orgs)) return;
-    setSaving(true);
-    try {
-      const existing = getOrganizations();
-      const maxId = existing.reduce((m, o) => Math.max(m, o.id), 0);
-      const newOrg: Organization = {
-        id: maxId + 1,
+ const handleAdd = async () => {
+  if (!validateForm(orgs)) return;
+  setSaving(true);
+
+  try {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+
+    // 1. Send POST request to FastAPI backend
+    const response = await fetch(`${API_BASE_URL}/organizations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         name: form.name.trim(),
+        description: form.description?.trim() || null,
         slug: form.slug.trim(),
-        logo_url: form.logo_url.trim() || undefined,
+        logo_url: form.logo_url.trim() || null,
         is_active: form.is_active,
-        projectCount: 0,
-        created_at: new Date().toISOString(),
-      };
-      const updated = [...existing, newOrg];
-      saveOrganizations(updated);
-      showToast(`Organization "${newOrg.name}" was added.`);
-      setShowAddModal(false);
-      loadOrgs();
-    } finally {
-      setSaving(false);
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to add organization');
     }
-  };
+
+    const createdOrg = await response.json();
+
+    // 2. Success feedback & UI reset
+    showToast(`Organization "${createdOrg.name}" was added successfully.`);
+    setShowAddModal(false);
+
+    // 3. Reload list from backend
+    loadOrgs();
+  } catch (error: any) {
+    console.error('Error adding organization:', error);
+    showToast(error.message || 'An error occurred while adding organization.', 'error');
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ── Edit Organization ──
-  const handleEdit = () => {
-    if (!editOrg || !validateForm(orgs, editOrg.id)) return;
-    setSaving(true);
-    try {
-      const existing = getOrganizations();
-      const updated = existing.map((o) =>
-        o.id === editOrg.id
-          ? { ...o, name: form.name.trim(), slug: form.slug.trim(), logo_url: form.logo_url.trim() || undefined, is_active: form.is_active }
-          : o
-      );
-      saveOrganizations(updated);
-      showToast(`Organization "${form.name}" was updated.`);
-      setEditOrg(null);
-      loadOrgs();
-    } finally {
-      setSaving(false);
+  const handleEdit = async () => {
+  if (!editOrg || !validateForm(orgs, editOrg.id)) return;
+  setSaving(true);
+
+  try {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+
+    // 1. Send PUT request to FastAPI backend with the organization ID
+    const response = await fetch(`${API_BASE_URL}/organizations/${editOrg.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: form.name.trim(),
+        description: form.description?.trim() || null,
+        slug: form.slug.trim(),
+        logo_url: form.logo_url.trim() || null,
+        is_active: form.is_active,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to update organization');
     }
-  };
+
+    const updatedOrg = await response.json();
+
+    // 2. Success feedback & UI reset
+    showToast(`Organization "${updatedOrg.name}" was updated successfully.`);
+    setEditOrg(null);
+
+    // 3. Reload list from backend
+    loadOrgs();
+  } catch (error: any) {
+    console.error('Error updating organization:', error);
+    showToast(error.message || 'An error occurred while updating organization.', 'error');
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ── Toggle Status ──
-  const handleToggle = () => {
-    if (!toggleOrg) return;
-    setSaving(true);
-    try {
-      const existing = getOrganizations();
-      const updated = existing.map((o) =>
-        o.id === toggleOrg.id ? { ...o, is_active: !o.is_active } : o
-      );
-      saveOrganizations(updated);
-      const verb = toggleOrg.is_active ? 'deactivated' : 'activated';
-      showToast(`Organization "${toggleOrg.name}" was ${verb}.`);
-      setToggleOrg(null);
-      loadOrgs();
-    } finally {
-      setSaving(false);
+ const handleToggle = async () => {
+  if (!toggleOrg) return;
+  setSaving(true);
+
+  try {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+    const newActiveStatus = !toggleOrg.is_active;
+
+    // 1. Send PUT request to update only the is_active status (or full payload)
+    const response = await fetch(`${API_BASE_URL}/organizations/${toggleOrg.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: toggleOrg.name,
+        slug: toggleOrg.slug,
+        description: toggleOrg.description || null,
+        logo_url: toggleOrg.logo_url || null,
+        is_active: newActiveStatus,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to toggle organization status');
     }
-  };
+
+    const updatedOrg = await response.json();
+
+    // 2. Success feedback & UI state reset
+    const verb = updatedOrg.is_active ? 'activated' : 'deactivated';
+    showToast(`Organization "${updatedOrg.name}" was ${verb}.`);
+    setToggleOrg(null);
+
+    // 3. Reload list from backend
+    loadOrgs();
+  } catch (error: any) {
+    console.error('Error toggling organization status:', error);
+    showToast(error.message || 'An error occurred while changing organization status.', 'error');
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ─── Render ───────────────────────────────────────────────────────────────
 

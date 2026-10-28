@@ -3,6 +3,7 @@ export interface Organization {
   name: string;
   slug: string;
   logo_url?: string;
+  description?: string;
   is_active: boolean;
   created_at?: string;
   // projectCount is a mock field — no backend /api/projects endpoint exists yet.
