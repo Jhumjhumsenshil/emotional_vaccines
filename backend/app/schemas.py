@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class PermissionOut(BaseModel):
@@ -86,3 +86,82 @@ class OrganizationResponse(OrganizationBase):
 
     class Config:
         orm_mode = True              
+
+
+class VideoStreamCreate(BaseModel):
+    language: str
+    stream_url: str
+    thumbnail_url: Optional[str] = None
+    title: Optional[str] = None
+
+class VideoStreamResponse(VideoStreamCreate):
+    id: int
+    video_id: int
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class VideoCreate(BaseModel):
+    category_id: Optional[int] = None
+    default_title: str
+    default_description: Optional[str] = None
+    duration_seconds: int = 0
+    default_thumbnail_url: Optional[str] = None
+    is_published: bool = True
+    streams: List[VideoStreamCreate] = []
+
+class VideoUpdate(BaseModel):
+    category_id: Optional[int] = None
+    default_title: Optional[str] = None
+    default_description: Optional[str] = None
+    duration_seconds: Optional[int] = None
+    default_thumbnail_url: Optional[str] = None
+    is_published: Optional[bool] = None
+    streams: Optional[List[VideoStreamCreate]] = None
+
+class VideoResponse(BaseModel):
+    id: int
+    category_id: Optional[int] = None
+    default_title: str
+    default_description: Optional[str] = None
+    duration_seconds: int
+    default_thumbnail_url: Optional[str] = None
+    is_published: bool
+    created_at: Optional[datetime] = None
+    streams: List[VideoStreamResponse] = []
+
+    class Config:
+        from_attributes = True  
+
+class TagResponse(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+# Update VideoCreate & VideoResponse to handle tags
+class VideoCreate(BaseModel):
+    category_id: Optional[int] = None
+    default_title: str
+    default_description: Optional[str] = None
+    duration_seconds: int = 0
+    default_thumbnail_url: Optional[str] = None
+    is_published: bool = True
+    streams: List[VideoStreamCreate] = []
+    tags: List[str] = [] # 👈 Accepts list of tag strings from frontend
+
+class VideoResponse(BaseModel):
+    id: int
+    category_id: Optional[int] = None
+    default_title: str
+    default_description: Optional[str] = None
+    duration_seconds: int
+    default_thumbnail_url: Optional[str] = None
+    is_published: bool
+    streams: List[VideoStreamResponse] = []
+    tags: List[TagResponse] = [] # 👈 Returns structured tag objects
+
+    class Config:
+        from_attributes = True              

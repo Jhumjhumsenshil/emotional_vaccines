@@ -2,7 +2,7 @@ export interface Video {
   id: string;
   title: string;
   description: string;
-  categoryId: string;
+  category_id: string;
   videoUrl: string;
   videoUrls?: string[];
   thumbnail: string;
@@ -25,10 +25,10 @@ export interface Category {
 }
 
 const initialCategories: Category[] = [
-  { id: 'c1', name: 'Self Care', description: 'Videos to help prioritize mental health and wellness', videoCount: 3 },
-  { id: 'c2', name: 'Families Thrive', description: 'Guidance and tools for family mental health', videoCount: 2 },
-  { id: 'c3', name: 'Crisis Resources', description: 'De-escalation and active listening techniques', videoCount: 1 },
-  { id: 'c4', name: 'Community Support', description: 'Peer-led mental health programs', videoCount: 1 },
+  { id: '1', name: 'Self Care', description: 'Videos to help prioritize mental health and wellness', videoCount: 3 },
+  { id: '2', name: 'Families Thrive', description: 'Guidance and tools for family mental health', videoCount: 2 },
+  { id: '3', name: 'Crisis Resources', description: 'De-escalation and active listening techniques', videoCount: 1 },
+  { id: '4', name: 'Community Support', description: 'Peer-led mental health programs', videoCount: 1 },
 ];
 
 const initialVideos: Video[] = [
@@ -36,7 +36,7 @@ const initialVideos: Video[] = [
     id: 'v1',
     title: 'Movement as Medicine: Exercise & Mental Health',
     description: 'How regular physical activity reshapes the brain, reduces depression, and builds emotional endurance — backed by current research.',
-    categoryId: 'c1',
+    category_id: '1',
     videoUrl: 'https://example.com/video1.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=400&q=80',
     language: 'English',
@@ -52,7 +52,7 @@ const initialVideos: Video[] = [
     id: 'v2',
     title: 'Grief & Growth: Navigating Loss Together',
     description: 'Compassionate guidance for families experiencing bereavement, including how to support grieving children and teens.',
-    categoryId: 'c2',
+    category_id: '2',
     videoUrl: 'https://example.com/video2.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=400&q=80',
     language: 'English',
@@ -68,7 +68,7 @@ const initialVideos: Video[] = [
     id: 'v3',
     title: 'Crisis Intervention: What to Say When It Matters Most',
     description: 'Training for first responders, counselors, and concerned community members on de-escalation and active listening techniques.',
-    categoryId: 'c3',
+    category_id: '3',
     videoUrl: 'https://example.com/video3.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
     language: 'English',
@@ -84,7 +84,7 @@ const initialVideos: Video[] = [
     id: 'v4',
     title: 'Sleep Science: Rest Your Way to Better Mental Health',
     description: 'The neuroscience of sleep and actionable strategies for improving sleep quality to boost mood, cognition, and emotional regulation.',
-    categoryId: 'c1',
+    category_id: '1',
     videoUrl: 'https://example.com/video4.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1511295742362-92c96b5ade36?auto=format&fit=crop&w=400&q=80',
     language: 'English',
@@ -100,7 +100,7 @@ const initialVideos: Video[] = [
     id: 'v5',
     title: 'The Power of Peer Support',
     description: 'Exploring how peer-led mental health programs reduce stigma and improve outcomes in schools and workplaces.',
-    categoryId: 'c4',
+    category_id: '4',
     videoUrl: 'https://example.com/video5.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=400&q=80',
     language: 'English',
@@ -116,7 +116,7 @@ const initialVideos: Video[] = [
     id: 'v6',
     title: 'Raising Resilient Kids in Uncertain Times',
     description: 'How to have honest, age-appropriate conversations with children about anxiety, loss, and change.',
-    categoryId: 'c2',
+    category_id: '2',
     videoUrl: 'https://example.com/video6.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1491438590914-bc09fcaaf77a?auto=format&fit=crop&w=400&q=80',
     language: 'English',

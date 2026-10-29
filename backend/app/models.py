@@ -70,4 +70,57 @@ class OrganizationModel(Base):
     slug = Column(String(100), nullable=False, unique=True)
     logo_url = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# Association table for many-to-many relationship
+video_tag_association = Table(
+    "video_tags",
+    Base.metadata,
+    Column("video_id", Integer, ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+
+class TagModel(Base):
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), unique=True, nullable=False)
+
+    videos = relationship("VideoModel", secondary=video_tag_association, back_populates="tags")  
+
+class VideoModel(Base):
+    __tablename__ = "videos"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    category_id = Column(Integer, nullable=True)
+    default_title = Column(String(255), nullable=False)
+    default_description = Column(Text, nullable=True)
+    duration_seconds = Column(Integer, nullable=False, default=0)
+    default_thumbnail_url = Column(Text, nullable=True)
+    is_published = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationship to streams
+    streams = relationship("VideoStreamModel", back_populates="video", cascade="all, delete-orphan")
+
+    tags = relationship("TagModel", secondary=video_tag_association, back_populates="videos")
+
+
+class VideoStreamModel(Base):
+    __tablename__ = "video_streams"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    video_id = Column(Integer, ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
+    language = Column(String(10), nullable=False)
+    stream_url = Column(Text, nullable=False)
+    thumbnail_url = Column(Text, nullable=True)
+    title = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    video = relationship("VideoModel", back_populates="streams")
+
+
+
+          

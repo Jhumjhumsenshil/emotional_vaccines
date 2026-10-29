@@ -7,6 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.organizations_api import router as organizations_router
+from app.videos_api import router as videos_router
 
 from app.db import get_db
 from app.models import User, Role, Permission
@@ -17,6 +18,7 @@ app = FastAPI(title="Video Portal & EmotionalVaccine API")
 
 
 app.include_router(organizations_router)
+app.include_router(videos_router)
 
 # Enable CORS for frontend interactions
 app.add_middleware(

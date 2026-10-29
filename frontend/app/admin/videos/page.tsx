@@ -81,51 +81,106 @@ export default function VideosPage() {
     }
   };
 
-  const handleUrlChange = (index: number, value: string) => {
-    const updated = [...videoUrls];
-    updated[index] = value;
-    setVideoUrls(updated);
-  };
+  // const handleUrlChange = (index: number, value: string) => {
+  //   const updated = [...videoUrls];
+  //   updated[index] = value;
+  //   setVideoUrls(updated);
+  // };
 
   const filteredLanguages = AVAILABLE_LANGUAGES.filter(lang =>
     lang.toLowerCase().includes(langSearch.toLowerCase())
   );
 
-  const handleSave = () => {
-    const cleanUrls = videoUrls.map(u => u.trim()).filter(Boolean);
-    if (!formData.title || !formData.categoryId || cleanUrls.length === 0) return;
+  // const handleSave = () => {
+  //   const cleanUrls = videoUrls.map(u => u.trim()).filter(Boolean);
+  //   if (!formData.title || !formData.categoryId || cleanUrls.length === 0) return;
     
-    const primaryUrl = cleanUrls[0];
-    const langs = selectedLanguages.length > 0 ? selectedLanguages : ['English'];
-    const languageString = langs.join(', ');
+  //   const primaryUrl = cleanUrls[0];
+  //   const langs = selectedLanguages.length > 0 ? selectedLanguages : ['English'];
+  //   const languageString = langs.join(', ');
 
-    const payload: Partial<Video> = {
-      ...formData,
-      videoUrl: primaryUrl,
-      videoUrls: cleanUrls,
-      language: languageString,
-      languages: langs,
+  //   const payload: Partial<Video> = {
+  //     ...formData,
+  //     videoUrl: primaryUrl,
+  //     videoUrls: cleanUrls,
+  //     language: languageString,
+  //     languages: langs,
+  //   };
+    
+  //   let updated;
+  //   if (editingVideo) {
+  //     updated = videos.map(v => v.id === editingVideo.id ? { ...v, ...payload } as Video : v);
+  //   } else {
+  //     updated = [...videos, { 
+  //       ...payload,
+  //       id: `v_${Date.now()}`,
+  //       views: 0,
+  //       createdAt: new Date().toISOString(),
+  //       tags: typeof formData.tags === 'string' ? (formData.tags as string).split(',').map(t => t.trim()) : formData.tags || [],
+  //     } as Video];
+  //   }
+    
+  //   // Sort by display order
+  //   updated.sort((a, b) => a.displayOrder - b.displayOrder);
+    
+  //   setVideos(updated);
+  //   saveMockVideos(updated);
+  //   closeModal();
+  // };
+
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+  const handleSave = async () => {
+    const cleanUrls = videoUrls.map(u => u.trim()).filter(Boolean);
+    if (!formData.title || !formData.category_id || cleanUrls.length === 0) return;
+    
+    const langs = selectedLanguages.length > 0 ? selectedLanguages : ['English'];
+
+    // Convert comma-separated string (e.g. "health, mental, care") into an array of clean strings
+    const tagList = typeof formData.tags === 'string'
+      ? (formData.tags as string).split(',').map(t => t.trim()).filter(Boolean)
+      : Array.isArray(formData.tags) ? formData.tags : [];
+
+    // Map your form state into the normalized database schema structure
+    const streamsPayload = cleanUrls.map((url, idx) => ({
+      language: langs[idx] || langs[0], // fallback mapping to selected languages
+      stream_url: url,
+      title: formData.title,
+      thumbnail_url: formData.thumbnail || null
+    }));
+
+    const payload = {
+      category_id: parseInt(formData.category_id) || null,
+      default_title: formData.title,
+      default_description: formData.description || null,
+      duration_seconds: formData.duration || 0,
+      default_thumbnail_url: formData.thumbnail || null,
+      is_published: !!formData.isPublished,
+      streams: streamsPayload,
+      tags: tagList
     };
-    
-    let updated;
-    if (editingVideo) {
-      updated = videos.map(v => v.id === editingVideo.id ? { ...v, ...payload } as Video : v);
-    } else {
-      updated = [...videos, { 
-        ...payload,
-        id: `v_${Date.now()}`,
-        views: 0,
-        createdAt: new Date().toISOString(),
-        tags: typeof formData.tags === 'string' ? (formData.tags as string).split(',').map(t => t.trim()) : formData.tags || [],
-      } as Video];
+
+    try {
+      if (editingVideo) {
+        const res = await fetch(`${API_BASE_URL}/videos/${editingVideo.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error('Failed to update video');
+      } else {
+        const res = await fetch(`${API_BASE_URL}/videos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error('Failed to create video');
+      }
+
+      //loadVideos();
+      closeModal();
+    } catch (error) {
+      console.error('Error saving video:', error);
     }
-    
-    // Sort by display order
-    updated.sort((a, b) => a.displayOrder - b.displayOrder);
-    
-    setVideos(updated);
-    saveMockVideos(updated);
-    closeModal();
   };
 
   const handleDelete = (id: string) => {
@@ -141,6 +196,12 @@ export default function VideosPage() {
     setVideos(updated);
     saveMockVideos(updated);
   };
+
+
+//   setFormData({ 
+//   ...video, 
+//   tags: video.tags ? video.tags.map((t: any) => t.name).join(', ') : '' 
+// });
 
   const openModal = (video?: Video) => {
     if (video) {
@@ -158,7 +219,7 @@ export default function VideosPage() {
     } else {
       setEditingVideo(null);
       setFormData({ 
-        title: '', description: '', categoryId: '', thumbnail: '',
+        title: '', description: '', category_id: '', thumbnail: '',
         duration: 0, isPublished: false, isFeatured: false,
         tags: [] as any, displayOrder: videos.length + 1
       });
@@ -180,11 +241,49 @@ export default function VideosPage() {
   const filtered = videos.filter(v => {
     const matchSearch = v.title.toLowerCase().includes(search.toLowerCase()) || 
                         v.description.toLowerCase().includes(search.toLowerCase());
-    const matchCat = filterCategory ? v.categoryId === filterCategory : true;
+    const matchCat = filterCategory ? v.category_id === filterCategory : true;
     const matchStatus = filterStatus === 'published' ? v.isPublished : 
                         filterStatus === 'unpublished' ? !v.isPublished : true;
     return matchSearch && matchCat && matchStatus;
   });
+
+
+  // Helper to extract video ID and auto-generate thumbnail URL from YouTube links
+const extractThumbnailFromUrl = (url: string): string => {
+  if (!url) return '';
+  
+  let videoId = '';
+  
+  // Handle standard watch URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)
+  if (url.includes('youtube.com/watch?v=')) {
+    videoId = url.split('v=')[1]?.substring(0, 11);
+  } 
+  // Handle short shared URL (e.g., https://youtu.be/VIDEO_ID)
+  else if (url.includes('youtu.be/')) {
+    videoId = url.split('be/')[1]?.substring(0, 11);
+  }
+
+  if (videoId && videoId.length === 11) {
+    return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  }
+
+  return ''; // Return empty if not a recognized platform link
+};
+
+
+const handleUrlChange = (index: number, value: string) => {
+  const updated = [...videoUrls];
+  updated[index] = value;
+  setVideoUrls(updated);
+
+  // If it's the primary URL (index 0), try to auto-extract the thumbnail
+  if (index === 0 && (!formData.thumbnail || formData.thumbnail.trim() === '')) {
+    const autoThumb = extractThumbnailFromUrl(value);
+    if (autoThumb) {
+      setFormData(prev => ({ ...prev, thumbnail: autoThumb }));
+    }
+  }
+};
 
   return (
     <AppLayout title="Video Management">
@@ -234,7 +333,7 @@ export default function VideosPage() {
                 <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No videos found.</td>
               </tr>
             ) : filtered.map(video => {
-              const cat = categories.find(c => c.id === video.categoryId);
+              const cat = categories.find(c => c.id === video.category_id);
               return (
                 <tr key={video.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
@@ -314,8 +413,8 @@ export default function VideosPage() {
           </div>
           <Select 
             label="Category" 
-            value={formData.categoryId || ''} 
-            onChange={e => setFormData({...formData, categoryId: e.target.value})}
+            value={formData.category_id || ''} 
+            onChange={e => setFormData({...formData, category_id: e.target.value})}
           >
             <option value="">Select Category...</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}

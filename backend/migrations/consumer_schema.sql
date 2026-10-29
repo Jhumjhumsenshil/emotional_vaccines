@@ -4,6 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE organizations (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    description VARCHAR(255),
     slug VARCHAR(100) UNIQUE NOT NULL,
     logo_url TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
@@ -97,3 +98,19 @@ CREATE TABLE video_watch_logs (
 
 CREATE INDEX ix_video_watch_logs_customer_video ON video_watch_logs(customer_id, video_id);
 CREATE INDEX ix_video_watch_logs_project_id ON video_watch_logs(project_id);
+
+
+
+-- 1. Tags Table
+CREATE TABLE tags (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 2. Video-Tags Junction Table (Many-to-Many Relationship)
+CREATE TABLE video_tags (
+    video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE,
+    tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (video_id, tag_id)
+);
