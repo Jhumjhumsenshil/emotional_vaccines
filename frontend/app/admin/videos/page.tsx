@@ -45,10 +45,53 @@ export default function VideosPage() {
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [langSearch, setLangSearch] = useState('');
   const langDropdownRef = useRef<HTMLDivElement>(null);
+ 
+
+  // ── Load Categories from API ──
+  const loadCategories = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories`);
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories', error);
+    }
+  };
+
+
+    const loadVideos = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/videos`);
+      if (res.ok) {
+        const data = await res.json();
+        
+        const formattedVideos = data.map((v: any) => ({
+          id: v.id,
+          category_id: v.category_id, // Can be number or null
+          title: v.default_title,
+          description: v.default_description,
+          thumbnail: v.default_thumbnail_url,
+          isPublished: v.is_published,
+          duration: v.duration_seconds,
+          views: v.views || 0, // Fallback if views aren't tracked yet
+          tags: v.tags || [],
+          streams: v.streams || []
+        }));
+        
+        setVideos(formattedVideos);
+      }
+    } catch (error) {
+      console.error('Failed to load videos', error);
+    }
+  };
 
   useEffect(() => {
     setVideos(getMockVideos());
-    setCategories(getMockCategories());
+    //setCategories(getMockCategories());
+    //loadVideos();
+    loadCategories();
   }, []);
 
   useEffect(() => {
@@ -333,14 +376,18 @@ const handleUrlChange = (index: number, value: string) => {
                 <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No videos found.</td>
               </tr>
             ) : filtered.map(video => {
-              const cat = categories.find(c => c.id === video.category_id);
+              const cat = categories.find(c => Number(c.id) === Number(video.category_id));
               return (
                 <tr key={video.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="flex items-center">
-                      <div className="h-10 w-16 flex-shrink-0 bg-gray-200 rounded overflow-hidden mr-3">
+                      <div className="relative w-20 h-12 flex-shrink-0 bg-gray-200 rounded overflow-hidden mr-3">
                         {video.thumbnail ? (
-                          <img src={video.thumbnail} alt="" className="h-full w-full object-cover" />
+                          <img 
+                            src={video.thumbnail} 
+                            alt={video.title} 
+                            className="absolute inset-0 w-full h-full object-cover" 
+                          />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center text-gray-400">🎬</div>
                         )}
