@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import AppLayout from '../../components/layout/AppLayout';
 import Modal from '../../components/ui/Modal';
 import { Input, Select, Button } from '../../components/ui/FormComponents';
@@ -35,6 +35,7 @@ interface OrgFormData {
   description: string;
   slug: string;
   logo_url: string;
+  logo_file?: File | null;
   is_active: boolean;
 }
 
@@ -260,41 +261,171 @@ function OrgDetailView({ org }: { org: OrgWithCounts }) {
 
 // ─── Organization Form ────────────────────────────────────────────────────────
 
-function OrgLogoPreview({ url }: { url: string }) {
-  const [broken, setBroken] = useState(false);
+function OrgLogoUpload({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (previewUrl: string, file: File | null) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Reset broken state whenever the URL changes
-  useEffect(() => { setBroken(false); }, [url]);
+function processFile(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    const previewUrl = URL.createObjectURL(file);
+    onChange(previewUrl, file); // 👈 Passes preview and raw file up
+  }
 
-  if (!url.trim()) return null;
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  }
+
+  const hasLogo = !!value;
+
+
+  
 
   return (
-    <div style={{
-      marginTop: '-0.5rem', marginBottom: '1rem',
-      display: 'flex', alignItems: 'center', gap: '0.75rem',
-      padding: '0.6rem 0.875rem',
-      background: '#f9fafb', border: '1px solid var(--border-color)',
-      borderRadius: 8,
-    }}>
-      <div style={{
-        width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
-        background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '0.7rem', color: '#9ca3af', fontWeight: 600,
-      }}>
-        {broken
-          ? <span style={{ fontSize: '1.25rem' }}>🖼️</span>
-          : <img
-              src={url}
-              alt="Logo preview"
-              style={{ width: 40, height: 40, objectFit: 'cover' }}
-              onError={() => setBroken(true)}
-            />}
+    <div style={{ gridColumn: '1 / -1', marginBottom: '1rem' }}>
+      {/* Label + hint */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.4rem' }}>
+        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>
+          Organization Logo
+        </label>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          Recommended: 200 x 200 px &middot; PNG, JPEG, JPG or SVG &middot; max 2 MB
+        </span>
       </div>
-      <div style={{ fontSize: '0.775rem', color: broken ? '#b91c1c' : 'var(--text-muted)' }}>
-        {broken
-          ? '⚠️ Could not load logo from this URL. It will still be saved but may not display.'
-          : 'Logo preview'}
+
+      {/* Drop zone */}
+      <div
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          padding: '0.875rem 1rem',
+          border: `2px dashed ${dragging ? 'var(--primary-color)' : 'var(--border-color)'}`,
+          borderRadius: 10,
+          background: dragging ? 'rgba(99,102,241,0.05)' : '#f9fafb',
+          cursor: 'pointer',
+          transition: 'border-color 0.2s, background 0.2s',
+          userSelect: 'none',
+        }}
+      >
+        {/* Thumbnail */}
+        <div style={{
+          width: 56, height: 56, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+          background: '#e5e7eb', border: '1px solid var(--border-color)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {hasLogo
+            ? <img src={value} alt="Logo thumbnail" style={{ width: 56, height: 56, objectFit: 'cover' }} />
+            : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="M21 15l-5-5L5 21" />
+              </svg>
+          }
+        </div>
+
+        {/* Instructions */}
+        <div style={{ flex: 1 }}>
+          {hasLogo ? (
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: 600 }}>
+              Logo uploaded
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}>Click to browse</span>
+              {' '}or drag and drop an image here
+            </div>
+          )}
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>
+            {hasLogo ? 'Click anywhere here to replace the current logo' : 'PNG, JPEG, JPG, SVG — max 2 MB'}
+          </div>
+        </div>
+
+        {/* Preview button */}
+        {hasLogo && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowPreview(true); }}
+            style={{
+              background: 'var(--primary-color, #6366f1)', color: '#fff', border: 'none',
+              borderRadius: 6, padding: '0.3rem 0.75rem',
+              fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+              flexShrink: 0, letterSpacing: '0.01em',
+            }}
+          >
+            Preview
+          </button>
+        )}
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={inputRef}
+        id="org-form-logo"
+        type="file"
+        accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
+      {/* Lightbox preview overlay */}
+      {showPreview && (
+        <div
+          onClick={() => setShowPreview(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 14, padding: '1.5rem',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
+              maxWidth: '90vw',
+            }}
+          >
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Logo Preview</div>
+            <img
+              src={value}
+              alt="Logo full preview"
+              style={{ maxWidth: 320, maxHeight: 320, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border-color)' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPreview(false)}
+              style={{
+                background: '#f3f4f6', color: 'var(--text-main)', border: 'none',
+                borderRadius: 6, padding: '0.4rem 1.2rem',
+                fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -306,7 +437,7 @@ function OrgFormPanel({
   errors: OrgFormErrors;
   isEdit: boolean;
   saving: boolean;
-  onChange: (field: keyof OrgFormData, value: string | boolean) => void;
+  onChange: (field: keyof OrgFormData, value: string | boolean | File | null) => void;
   onSubmit: () => void;
   onCancel: () => void;
 }) {
@@ -356,33 +487,33 @@ function OrgFormPanel({
             }}
             value={form.description}
             onChange={(e) => onChange('description', e.target.value)}
-          />          
-          </div>
-           
-         
-        <Input
+          />   
+
+
+           <Input
           id="org-form-slug"
           label="Slug *"
           placeholder="e.g. acme-health"
           value={form.slug}
           onChange={(e) => onChange('slug', e.target.value)}
           error={errors.slug}
-        />
-
-        <Input
-          id="org-form-logo"
-          label="Logo URL"
-          placeholder="https://example.com/logo.png"
-          value={form.logo_url}
-          onChange={(e) => onChange('logo_url', e.target.value)}
-          type="url"
-        />
+        />         
+          </div>
+           
+         
+          
         
      </div>
 
-      {/* Live logo preview — appears below the Logo URL field */}
-      <OrgLogoPreview url={form.logo_url} />
-
+        {/* Logo upload with inline preview */}
+      <OrgLogoUpload
+          value={form.logo_url}
+          onChange={(previewUrl, file) => {
+            onChange('logo_url', previewUrl);
+            onChange('logo_file', file);
+          }}
+        />
+      
       <div style={{ marginBottom: '1rem' }}>
         <Select
           id="org-form-status"
@@ -429,7 +560,7 @@ export default function OrganizationPage() {
   const [toggleOrg, setToggleOrg] = useState<OrgWithCounts | null>(null);
 
   // Form
-  const emptyForm: OrgFormData = { name: '', description: '', slug: '', logo_url: '', is_active: true };
+  const emptyForm: OrgFormData = { name: '', description: '', slug: '', logo_url: '', logo_file: null, is_active: true };
   const [form, setForm]         = useState<OrgFormData>(emptyForm);
   const [formErrors, setFormErrors] = useState<OrgFormErrors>({});
   const [saving, setSaving]     = useState(false);
@@ -545,22 +676,22 @@ const loadOrgs = useCallback(async () => {
   };
 
   const openEdit = (o: OrgWithCounts) => {
-    setForm({ name: o.name, description: o.description ?? '', slug: o.slug, logo_url: o.logo_url ?? '', is_active: o.is_active });
+    setForm({ name: o.name, description: o.description ?? '', slug: o.slug, logo_url: o.logo_url ?? '', logo_file: null, is_active: o.is_active });
     setFormErrors({});
     setEditOrg(o);
   };
 
-  const updateForm = (field: keyof OrgFormData, value: string | boolean) => {
-    setForm((prev) => {
-      const next = { ...prev, [field]: value };
-      // Auto-generate slug from name when adding
-      if (field === 'name' && typeof value === 'string') {
-        next.slug = slugify(value);
-      }
-      return next;
-    });
-    setFormErrors((prev) => ({ ...prev, [field]: undefined }));
-  };
+  const updateForm = (field: keyof OrgFormData, value: string | boolean | File | null) => {
+  setForm((prev) => {
+    const next = { ...prev, [field]: value };
+    // Auto-generate slug from name when adding
+    if (field === 'name' && typeof value === 'string') {
+      next.slug = slugify(value);
+    }
+    return next;
+  });
+  setFormErrors((prev) => ({ ...prev, [field]: undefined }));
+};
 
   const validateForm = (existingOrgs: OrgWithCounts[], editingId?: number): boolean => {
     const errs: OrgFormErrors = {};
@@ -588,47 +719,56 @@ const loadOrgs = useCallback(async () => {
 
   // ── Add Organization ──
  const handleAdd = async () => {
-  if (!validateForm(orgs)) return;
-  setSaving(true);
+    if (!validateForm(orgs)) return;
+    setSaving(true);
+    // 👇 ADD THIS DEBUG LOG
+  console.log("Submitting Form Data:", {
+    name: form.name,
+    slug: form.slug,
+    logo_file: form.logo_file, // Is this a File object or null?
+  });
 
-  try {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 
-    // 1. Send POST request to FastAPI backend
-    const response = await fetch(`${API_BASE_URL}/organizations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: form.name.trim(),
-        description: form.description?.trim() || null,
-        slug: form.slug.trim(),
-        logo_url: form.logo_url.trim() || null,
-        is_active: form.is_active,
-      }),
-    });
+      // 1. Create a FormData instance to hold text fields and file binary
+      const formData = new FormData();
+      formData.append('name', form.name.trim());
+      formData.append('description', form.description?.trim() || '');
+      formData.append('slug', form.slug.trim());
+      formData.append('is_active', String(form.is_active)); // FormData converts values to strings
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to add organization');
+      // 👇 Corrected logo handling: append logo URL or text representation properly
+     if (form.logo_file) {
+      formData.append('logo', form.logo_file);
     }
 
-    const createdOrg = await response.json();
+      // 2. Send POST request to FastAPI backend (NOTE: Do NOT set 'Content-Type' header)
+      const response = await fetch(`${API_BASE_URL}/organizations`, {
+        method: 'POST',
+        body: formData, 
+      });
 
-    // 2. Success feedback & UI reset
-    showToast(`Organization "${createdOrg.name}" was added successfully.`);
-    setShowAddModal(false);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to add organization');
+      }
 
-    // 3. Reload list from backend
-    loadOrgs();
-  } catch (error: any) {
-    console.error('Error adding organization:', error);
-    showToast(error.message || 'An error occurred while adding organization.', 'error');
-  } finally {
-    setSaving(false);
-  }
-};
+      const createdOrg = await response.json();
+
+      // 3. Success feedback & UI reset
+      showToast(`Organization "${createdOrg.name}" was added successfully.`);
+      setShowAddModal(false);
+
+      // 4. Reload list from backend
+      loadOrgs();
+    } catch (error: any) {
+      console.error('Error adding organization:', error);
+      showToast(error.message || 'An error occurred while adding organization.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // ── Edit Organization ──
   const handleEdit = async () => {

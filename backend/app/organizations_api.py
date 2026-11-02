@@ -1,6 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile
 from sqlalchemy.orm import Session
 from typing import List
+from pathlib import Path
+import shutil
+import uuid
 
 # Import your database session, models, and schemas here
 # from database import get_db
@@ -12,6 +15,9 @@ from app import models, schemas
 
 router = APIRouter(prefix="/api/organizations", tags=["Organizations"])
 
+UPLOAD_DIR = Path("uploads/logos")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True) # Creates folder if it doesn't exist
+
 # 1. Get All Organizations
 @router.get("", response_model=List[schemas.OrganizationResponse])
 def get_organizations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -20,16 +26,51 @@ def get_organizations(skip: int = 0, limit: int = 100, db: Session = Depends(get
 
 # 2. Create an Organization
 @router.post("", response_model=schemas.OrganizationResponse, status_code=status.HTTP_201_CREATED)
-def create_organization(org: schemas.OrganizationCreate, db: Session = Depends(get_db)):
-    # Check for duplicate slug
-    existing = db.query(models.OrganizationModel).filter(models.OrganizationModel.slug == org.slug).first()
+def create_organization(
+    name: str = Form(...),
+    slug: str = Form(...),
+    description: str = Form(None),
+    is_active: bool = Form(True),
+    logo: UploadFile = File(None), # Optional logo file upload
+    db: Session = Depends(get_db)
+):
+    # 1. Check for duplicate slug
+    existing = db.query(models.OrganizationModel).filter(models.OrganizationModel.slug == slug).first()
     if existing:
-        raise HTTPException(status_code=400, detail=f"Slug '{org.slug}' is already in use.")
+        raise HTTPException(status_code=400, detail=f"Slug '{slug}' is already in use.")
     
-    db_org = models.OrganizationModel(**org.dict())
+    logo_url = None
+
+    # 2. Handle logo file upload if provided
+    if logo:
+        ext = logo.filename.split(".")[-1].lower()
+        if ext not in ["png", "jpeg", "jpg", "svg"]:
+            raise HTTPException(status_code=400, detail="Invalid image format. Allowed: PNG, JPEG, SVG")
+
+        # Generate a unique filename using uuid4 and keep the original file extension
+        unique_filename = f"{uuid.uuid4()}.{ext}"
+
+        # Save file locally into the server folder
+        file_path = UPLOAD_DIR / unique_filename
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(logo.file, buffer)
+        
+        # Generate relative URL path to store in the database column
+        logo_url = f"/static/logos/{unique_filename}"
+
+    # 3. Create database model instance with fields and the local logo URL path
+    db_org = models.OrganizationModel(
+        name=name,
+        slug=slug,
+        description=description,
+        is_active=is_active,
+        logo_url=logo_url
+    )
+
     db.add(db_org)
     db.commit()
     db.refresh(db_org)
+    
     return db_org
 
 # 3. Update an Organization

@@ -9,6 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app.organizations_api import router as organizations_router
 from app.videos_api import router as videos_router
 from app.categories_api import router as categories_router
+from fastapi.staticfiles import StaticFiles
 
 from app.db import get_db
 from app.models import User, Role, Permission
@@ -16,6 +17,9 @@ from app import models, schemas
 
 
 app = FastAPI(title="Video Portal & EmotionalVaccine API")
+
+
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 
 app.include_router(organizations_router)
