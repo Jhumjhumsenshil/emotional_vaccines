@@ -6,7 +6,6 @@ from app.db import get_db
 from app.models import User
 
 app = FastAPI(title="Video Portal API")
-
 @app.get("/api/health")
 def health_check():
     return {
