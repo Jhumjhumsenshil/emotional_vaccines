@@ -7,6 +7,13 @@ from app.models import User
 
 app = FastAPI(title="Video Portal API")
 
+@app.get("/api/health")
+def health_check():
+    return {
+        "status": "connected",
+        "message": "Emotional Vaccines API is running"
+    }
+
 # Pydantic schema for incoming request payload
 class RegisterSchema(BaseModel):
     name: str
