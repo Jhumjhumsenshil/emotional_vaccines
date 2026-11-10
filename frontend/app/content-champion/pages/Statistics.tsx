@@ -1,18 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import StatsChart from '../components/StatsChart';
+import StatsChart, { VideoItem } from '../components/StatsChart';
 
 
-export interface VideoItem {
-  id: string;
-  title: string;
-  category: string;
-  description: string;
-  views: number; // Ensure 'views' is included here
-  tags?: string[];
-  [key: string]: any;
-}
 
 interface TimeseriesItem {
   date: string;
