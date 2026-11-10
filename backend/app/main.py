@@ -46,7 +46,10 @@ app.include_router(search_videos_api)
 # Enable CORS for frontend interactions
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://emotionalvaccines-gnwx.vercel.app",
+        "http://localhost:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
