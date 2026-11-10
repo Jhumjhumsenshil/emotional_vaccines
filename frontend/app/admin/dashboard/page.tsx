@@ -199,7 +199,7 @@ export default function AdminDashboardPage() {
             {/* Video Rows */}
             <div className="divide-y divide-gray-100">
               {filteredVideos.map((video) => {
-                const categoryName = categoriesMap[video.categoryId] || 'Self Care';
+                const categoryName = categoriesMap[video.category_id] || 'Self Care';
                 const categoryTagStyle = getCategoryTagStyle(categoryName);
                 
                 return (

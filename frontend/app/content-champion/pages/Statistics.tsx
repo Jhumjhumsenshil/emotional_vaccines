@@ -3,6 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import StatsChart from '../components/StatsChart';
 
+
+export interface VideoItem {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  views: number; // Ensure 'views' is included here
+  tags?: string[];
+  [key: string]: any;
+}
+
 interface TimeseriesItem {
   date: string;
   views: number;
@@ -23,14 +34,6 @@ interface ActivityItem {
   type: 'outreach' | 'milestone' | 'recipient' | 'campaign';
 }
 
-interface VideoItem {
-  id: string;
-  title: string;
-  category: string;
-  description: string;
-  tags?: string[];
-  [key: string]: any;
-}
 
 interface StatsData {
   overview: {
@@ -112,31 +115,28 @@ export default function Statistics() {
   useEffect(() => {
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
-    // Fetch aggregated stats
     fetch(`${API_BASE_URL}/api/stats?startDate=${startDate}&endDate=${endDate}`)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(j => {
         if (j.data) {
           setStats(prev => ({
             ...prev,
-            overview:             j.data.overview             || prev.overview,
-            timeseries:           j.data.timeseries           || prev.timeseries,
-            viewsByVideo:         j.data.viewsByVideo         || prev.viewsByVideo,
-            categoryPerformance:  j.data.categoryPerformance  || prev.categoryPerformance,
-            recentActivities:     j.data.recentActivities     || prev.recentActivities,
+            overview:            j.data.overview            || prev.overview,
+            timeseries:          j.data.timeseries          || prev.timeseries,
+            viewsByVideo:        j.data.viewsByVideo        || prev.viewsByVideo,
+            categoryPerformance: j.data.categoryPerformance || prev.categoryPerformance,
+            recentActivities:    j.data.recentActivities    || prev.recentActivities,
           }));
         }
       })
       .catch(() => {});
 
-    // Fetch videos for chart
     fetch(`${API_BASE_URL}/api/videos?limit=50`)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(j => { if (j.videos) setVideos(j.videos); })
       .catch(() => {});
   }, [startDate, endDate]);
 
-  // ── Keyword filtering ──────────────────────────────────────────────
   const kw = keyword.trim().toLowerCase();
   const allVideos = videos.length ? videos : stats.viewsByVideo || [];
 
@@ -159,7 +159,7 @@ export default function Statistics() {
     : stats.categoryPerformance;
 
   const kpis = [
-    { label: 'Total Video Views',      value: formatNum(stats.overview.totalViews),         growth: stats.overview.viewsGrowthPercent,      key: 'views' },
+    { label: 'Total Video Views',      value: formatNum(stats.overview.totalViews),        growth: stats.overview.viewsGrowthPercent,      key: 'views' },
     { label: 'Total Engagements',      value: formatNum(stats.overview.totalEngagement),      growth: stats.overview.engagementGrowthPercent,  key: 'engagement' },
     { label: 'Active Recipients',      value: stats.overview.activeRecipients,              growth: stats.overview.recipientsGrowthPercent,  key: 'recipients' },
     { label: 'Campaign Conversion',    value: `${stats.overview.campaignConversionRate}%`,   growth: stats.overview.conversionGrowthPercent,  key: 'conversion' },
@@ -167,11 +167,9 @@ export default function Statistics() {
 
   return (
     <div>
-      {/* Page heading + filters */}
       <div className="section-heading">
         <h2 className="section-title">Analytics &amp; Insights</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {/* Keyword search */}
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <svg
               width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.2"
@@ -221,7 +219,6 @@ export default function Statistics() {
             )}
           </div>
 
-          {/* Date range */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               type="date"
@@ -243,7 +240,6 @@ export default function Statistics() {
         </div>
       </div>
 
-      {/* Active keyword badge */}
       {kw && (
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -267,7 +263,6 @@ export default function Statistics() {
         </div>
       )}
 
-      {/* KPI Cards */}
       <div className="stats-kpi-grid">
         {kpis.map(k => (
           <div key={k.key} className="kpi-card">
@@ -278,7 +273,6 @@ export default function Statistics() {
         ))}
       </div>
 
-      {/* Charts — uses filtered videos */}
       <StatsChart
         videos={filteredVideos}
         timeseries={stats.timeseries}
@@ -286,10 +280,7 @@ export default function Statistics() {
         endDate={endDate}
       />
 
-      {/* Bottom split: Category Performance + Activity Feed */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16 }}>
-
-        {/* Category Performance — visual horizontal bars */}
         <div className="chart-card">
           <div className="chart-card-header">
             <div>
@@ -339,7 +330,6 @@ export default function Statistics() {
           )}
         </div>
 
-        {/* Activity Feed — with type badges */}
         <div className="chart-card">
           <div className="chart-card-header">
             <div>
