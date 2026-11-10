@@ -22,6 +22,13 @@ from app.db import get_db
 from app.models import User, Role, Permission
 from app import models, schemas
 
+app = FastAPI(title="Video Portal API")
+@app.get("/api/health")
+def health_check():
+    return {
+        "status": "connected",
+        "message": "Emotional Vaccines API is running"
+    }
 
 app = FastAPI(title="Video Portal & EmotionalVaccine API")
 
