@@ -1,0 +1,18 @@
+// Shared fallback video list for the "Videos for My Recipients" page.
+// Kept here so App.jsx can compute the total count and MyRecipients.jsx
+// can show the same data without duplicating the definition.
+
+export const FALLBACK_RECIPIENT_VIDEOS = [
+  { id: "vid-001", title: "6D Effect",                  category: "Families Thrive", description: "Tips to identify and mitigate risk factors for youth suicide and violence.",                                                              thumbnail: "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=80&h=60&fit=crop", languages: ["EN", "SP"], rating: 4 },
+  { id: "vid-002", title: "ACEs Lose",                  category: "Self Care",        description: "Tips to help mitigate the long term impact of ACEs, Adverse Childhood Experiences, and enhance childhood resiliency.",                    thumbnail: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=80&h=60&fit=crop", languages: ["EN", "SP"], rating: 3 },
+  { id: "vid-003", title: "Difficult Conversations",    category: "Self Care",        description: "How to start and maintain difficult conversations with those struggling with life's challenges.",                                          thumbnail: "https://images.unsplash.com/photo-1491438590914-bc09fcaaf77a?w=80&h=60&fit=crop", languages: ["EN", "SP"], rating: 4 },
+  { id: "vid-004", title: "Ritual",                     category: "Self Care",        description: "Tips for managing holiday stress.",                                                                                                       thumbnail: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=80&h=60&fit=crop", languages: ["EN", "SP"], rating: 3 },
+  { id: "vid-005", title: "Risky Business",             category: "Self Care",        description: "A guide on how to make healthy and safe choices about life.",                                                                             thumbnail: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=80&h=60&fit=crop", languages: ["EN", "SP"], rating: 4 },
+  { id: "vid-006", title: "Rewind, Play, and Forward",  category: "Self Care",        description: "Using past experiences to build a happy future.",                                                                                        thumbnail: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=80&h=60&fit=crop", languages: ["EN"],        rating: 3 },
+  { id: "vid-007", title: "Return to Routine",          category: "Families Thrive", description: "How to best help children get through a mass, violent event.",                                                                           thumbnail: "https://images.unsplash.com/photo-1484863137850-59afcfe05386?w=80&h=60&fit=crop", languages: ["EN", "SP"], rating: 4 },
+  { id: "vid-008", title: "Responsible Energy",         category: "Self Care",        description: "Tips on how to cleanse your energy, for a healthy and alert mind.",                                                                      thumbnail: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=80&h=60&fit=crop", languages: ["EN"],        rating: 3 },
+  { id: "vid-009", title: "Reshaping",                  category: "Self Care",        description: "Tips for women on how to address body changes after birth.",                                                                             thumbnail: "https://images.unsplash.com/photo-1543335078-a76bc4aa28d9?w=80&h=60&fit=crop", languages: ["EN", "SP"], rating: 4 },
+];
+
+// Set of IDs already in the fallback list — used for dedup in App.jsx
+export const FALLBACK_RECIPIENT_IDS = new Set(FALLBACK_RECIPIENT_VIDEOS.map(v => v.id));

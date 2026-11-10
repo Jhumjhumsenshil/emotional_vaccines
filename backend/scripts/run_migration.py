@@ -8,7 +8,7 @@ DB_CONFIG = {
     "password": "postgres123",
 }
 
-with open("migrations/V1__init_rbac_schema.sql", "r") as file:
+with open("migrations/consumer_schema.sql", "r") as file:
     sql = file.read()
 
 connection = psycopg2.connect(**DB_CONFIG)

@@ -1,9 +1,26 @@
+import os
+from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
-from werkzeug.security import generate_password_hash,check_password_hash
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
+from werkzeug.security import generate_password_hash, check_password_hash
+from app.organizations_api import router as organizations_router
+from app.videos_api import router as videos_router
+from app.categories_api import router as categories_router
+from app.customers_api import router as customer_router
+from app.recipients_api import router as recipients_api
+from app.search_videos_api import router as search_videos_api
+
+from fastapi.staticfiles import StaticFiles
+from fastapi import Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
 from app.db import get_db
-from app.models import User
+from app.models import User, Role, Permission
+from app import models, schemas
 
 app = FastAPI(title="Video Portal API")
 @app.get("/api/health")
@@ -13,36 +30,95 @@ def health_check():
         "message": "Emotional Vaccines API is running"
     }
 
-# Pydantic schema for incoming request payload
+app = FastAPI(title="Video Portal & EmotionalVaccine API")
+
+
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
+
+
+app.include_router(organizations_router)
+app.include_router(videos_router)
+app.include_router(categories_router)
+app.include_router(customer_router)
+app.include_router(recipients_api)
+app.include_router(search_videos_api)
+
+# Enable CORS for frontend interactions
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/api/health")
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "message": "FastAPI is running"}
+
+
+# ----------------------------------------------------
+# Pydantic Schemas
+# ----------------------------------------------------
 class RegisterSchema(BaseModel):
     name: str
-    username: str
     email: EmailStr
     password: str
-    
+    username: Optional[str] = None
 
+
+class LoginSchema(BaseModel):
+    username: str  # Accepts either username or email
+    password: str
+
+
+class RoleAssignSchema(BaseModel):
+    role_name: str
+
+
+class StatusUpdateSchema(BaseModel):
+    is_active: Optional[bool] = None
+    status: Optional[str] = None
+
+
+# ----------------------------------------------------
+# Auth Endpoints
+# ----------------------------------------------------
 @app.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
 def register_user(user_data: RegisterSchema, db: Session = Depends(get_db)):
+    # Generate username from email if not explicitly provided
+    desired_username = user_data.username.strip() if user_data.username and user_data.username.strip() else user_data.email.split("@")[0]
+
     # 1. Check if email or username already exists
     existing_user = db.query(User).filter(
-        (User.email == user_data.email) | (User.username == user_data.username)
+        (User.email == user_data.email) | (User.username == desired_username)
     ).first()
 
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or Email already exists."
-        )
+        if existing_user.email == user_data.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account with this email address already exists."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This username is already taken. Please choose another."
+            )
 
-    # 2. Hash password using scrypt (matching your existing DB hashes)
+    # 2. Hash password using scrypt
     hashed_pwd = generate_password_hash(user_data.password, method="scrypt")
 
-    # 3. Create new user instance
+    # 3. Create new user instance with status "pending", is_active True, NO role assigned
     new_user = User(
-        name=user_data.name,
-        username=user_data.username,
-        email=user_data.email,
-        password_hash=hashed_pwd
+        name=user_data.name.strip(),
+        username=desired_username,
+        email=user_data.email.strip().lower(),
+        password_hash=hashed_pwd,
+        status="pending",
+        is_active=True,
     )
 
     # 4. Save to database
@@ -57,18 +133,28 @@ def register_user(user_data: RegisterSchema, db: Session = Depends(get_db)):
             detail=f"Database error: {str(e)}"
         )
 
-    return {"message": "User registered successfully", "id": new_user.id}
-
-class LoginSchema(BaseModel):
-    username: str  # Accepts either username or email
-    password: str
+    return {
+        "message": "Registration successful! Your account is waiting for Super Admin approval.",
+        "status": "pending",
+        "user": {
+            "id": new_user.id,
+            "name": new_user.name,
+            "username": new_user.username,
+            "email": new_user.email,
+            "status": new_user.status,
+            "is_active": new_user.is_active,
+            "role": None
+        }
+    }
 
 
 @app.post("/api/auth/login")
 def login_user(credentials: LoginSchema, db: Session = Depends(get_db)):
-    # 1. Fetch user by username OR email
-    user = db.query(User).filter(
-        (User.username == credentials.username) | (User.email == credentials.username)
+    login_identifier = credentials.username.strip()
+
+    # 1. Fetch user by username OR email (with roles eagerly loaded)
+    user = db.query(User).options(joinedload(User.roles)).filter(
+        (User.username == login_identifier) | (User.email == login_identifier.lower())
     ).first()
 
     # 2. Validate user presence and verify password hash
@@ -78,13 +164,365 @@ def login_user(credentials: LoginSchema, db: Session = Depends(get_db)):
             detail="Invalid username/email or password."
         )
 
-    # 3. Return user session data
+    # 3. Check if user is deactivated
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been deactivated by the Administrator."
+        )
+
+    # 4. Check approval status / role assignment
+    # Users with status 'pending' or without any role cannot log in yet
+    user_role = user.roles[0].name if user.roles else None
+    if user.status == "pending" or not user_role:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is waiting for Super Admin approval."
+        )
+
+    # 5. Return user session data
     return {
         "message": "Login successful",
         "user": {
             "id": user.id,
             "name": user.name,
             "username": user.username,
-            "email": user.email
+            "email": user.email,
+            "role": user_role,
+            "status": user.status,
+            "is_active": user.is_active
         }
     }
+
+
+# ----------------------------------------------------
+# Roles & Admin User Management Endpoints
+# ----------------------------------------------------
+@app.get("/api/permissions", response_model=list[schemas.PermissionOut])
+def get_all_permissions(db: Session = Depends(get_db)):
+    return db.query(Permission).order_by(Permission.id.asc()).all()
+
+
+@app.get("/api/roles", response_model=list[schemas.RoleDetailOut])
+def get_roles(db: Session = Depends(get_db)):
+    roles = db.query(Role).options(joinedload(Role.permissions), joinedload(Role.users)).order_by(Role.id.asc()).all()
+    # Unique across joinedload
+    unique_roles = {r.id: r for r in roles}.values()
+    return [
+        schemas.RoleDetailOut(
+            id=r.id,
+            name=r.name,
+            description=r.description,
+            users_count=len(r.users),
+            permissions=[
+                schemas.PermissionOut(id=p.id, slug=p.slug, description=p.description)
+                for p in r.permissions
+            ]
+        )
+        for r in unique_roles
+    ]
+
+
+@app.get("/api/roles/{role_id}", response_model=schemas.RoleDetailOut)
+def get_role_by_id(role_id: int, db: Session = Depends(get_db)):
+    role = db.query(Role).options(joinedload(Role.permissions), joinedload(Role.users)).filter(Role.id == role_id).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Role with ID {role_id} not found."
+        )
+    return schemas.RoleDetailOut(
+        id=role.id,
+        name=role.name,
+        description=role.description,
+        users_count=len(role.users),
+        permissions=[
+            schemas.PermissionOut(id=p.id, slug=p.slug, description=p.description)
+            for p in role.permissions
+        ]
+    )
+
+
+@app.post("/api/roles", response_model=schemas.RoleDetailOut, status_code=status.HTTP_201_CREATED)
+def create_role(payload: schemas.RoleCreate, db: Session = Depends(get_db)):
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Role name cannot be empty."
+        )
+    
+    existing = db.query(Role).filter(func.lower(Role.name) == name.lower()).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A role with the name '{name}' already exists."
+        )
+    
+    assigned_permissions = []
+    if payload.permission_ids:
+        assigned_permissions = db.query(Permission).filter(Permission.id.in_(payload.permission_ids)).all()
+    
+    new_role = Role(
+        name=name,
+        description=payload.description.strip() if payload.description else None,
+        permissions=assigned_permissions
+    )
+    
+    try:
+        db.add(new_role)
+        db.commit()
+        db.refresh(new_role)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create role: {str(e)}"
+        )
+    
+    return schemas.RoleDetailOut(
+        id=new_role.id,
+        name=new_role.name,
+        description=new_role.description,
+        users_count=0,
+        permissions=[
+            schemas.PermissionOut(id=p.id, slug=p.slug, description=p.description)
+            for p in new_role.permissions
+        ]
+    )
+
+
+@app.put("/api/roles/{role_id}", response_model=schemas.RoleDetailOut)
+def update_role(role_id: int, payload: schemas.RoleUpdate, db: Session = Depends(get_db)):
+    role = db.query(Role).options(joinedload(Role.permissions), joinedload(Role.users)).filter(Role.id == role_id).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Role with ID {role_id} not found."
+        )
+    
+    if payload.name is not None:
+        name = payload.name.strip()
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Role name cannot be empty."
+            )
+        if role.name == "Super Admin" and name != "Super Admin":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The name of 'Super Admin' role cannot be modified."
+            )
+        existing = db.query(Role).filter(func.lower(Role.name) == name.lower(), Role.id != role_id).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Another role with the name '{name}' already exists."
+            )
+        role.name = name
+
+    if payload.description is not None:
+        role.description = payload.description.strip() if payload.description else None
+
+    if payload.permission_ids is not None:
+        perms = db.query(Permission).filter(Permission.id.in_(payload.permission_ids)).all()
+        role.permissions = perms
+
+    try:
+        db.commit()
+        db.refresh(role)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update role: {str(e)}"
+        )
+
+    return schemas.RoleDetailOut(
+        id=role.id,
+        name=role.name,
+        description=role.description,
+        users_count=len(role.users),
+        permissions=[
+            schemas.PermissionOut(id=p.id, slug=p.slug, description=p.description)
+            for p in role.permissions
+        ]
+    )
+
+
+@app.delete("/api/roles/{role_id}")
+def delete_role(role_id: int, db: Session = Depends(get_db)):
+    role = db.query(Role).options(joinedload(Role.users)).filter(Role.id == role_id).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Role with ID {role_id} not found."
+        )
+
+    if role.name in ["Super Admin", "Administrator"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"System role '{role.name}' cannot be deleted."
+        )
+
+    if role.users and len(role.users) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete role '{role.name}' because {len(role.users)} user(s) are currently assigned to it. Please reassign those users first."
+        )
+
+    try:
+        db.delete(role)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete role: {str(e)}"
+        )
+
+    return {"message": f"Role '{role.name}' has been successfully deleted."}
+
+
+
+@app.get("/api/admin/users")
+def get_all_users(db: Session = Depends(get_db)):
+    users = db.query(User).options(joinedload(User.roles)).order_by(User.id.desc()).all()
+    user_list = []
+    for u in users:
+        role_name = u.roles[0].name if u.roles else None
+        role_id = u.roles[0].id if u.roles else None
+        user_list.append({
+            "id": u.id,
+            "name": u.name,
+            "username": u.username,
+            "email": u.email,
+            "status": u.status,
+            "is_active": u.is_active,
+            "role": role_name,
+            "role_id": role_id,
+            "created_at": u.created_at.isoformat() if u.created_at else None
+        })
+    return user_list
+
+
+
+@app.post("/api/admin/users/{user_id}/role")
+def assign_user_role(user_id: int, payload: RoleAssignSchema, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found."
+        )
+
+    role = db.query(Role).filter(Role.name == payload.role_name).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Role '{payload.role_name}' does not exist."
+        )
+
+    # Assign role and approve user
+    user.roles = [role]
+    user.status = "approved"
+
+    try:
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update user role: {str(e)}"
+        )
+
+    return {
+        "message": f"Assigned role '{role.name}' and approved {user.name}.",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "username": user.username,
+            "email": user.email,
+            "status": user.status,
+            "is_active": user.is_active,
+            "role": role.name
+        }
+    }
+
+
+@app.post("/api/admin/users/{user_id}/status")
+def toggle_user_status(user_id: int, payload: StatusUpdateSchema, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found."
+        )
+
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+
+    if payload.status is not None:
+        user.status = payload.status
+
+    try:
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update user status: {str(e)}"
+        )
+
+    action_text = "activated" if user.is_active else "deactivated"
+    return {
+        "message": f"User {user.name} has been {action_text}.",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "username": user.username,
+            "email": user.email,
+            "status": user.status,
+            "is_active": user.is_active,
+            "role": user.roles[0].name if user.roles else None
+        }
+    }
+
+
+@app.delete("/api/admin/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found."
+        )
+
+    if user.username == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The root Administrator account cannot be deleted."
+        )
+
+    try:
+        db.delete(user)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete user: {str(e)}"
+        )
+
+    return {"message": f"User {user.name} ({user.username}) was deleted."}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print("Validation Error:", exc.errors())
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
