@@ -19,6 +19,29 @@ const C = {
   rose:    '#f43f5e',
 };
 
+export interface VideoItem {
+  id: string;
+  title: string;
+  views: number;
+  recipientCount?: number;
+  [key: string]: any;
+}
+
+export interface TimeseriesItem {
+  date: string;
+  views: number;
+  engagement: number;
+  shares: number;
+  [key: string]: any;
+}
+
+export interface StatsChartProps {
+  videos?: VideoItem[];
+  timeseries?: TimeseriesItem[];
+  startDate?: string;
+  endDate?: string;
+}
+
 interface TooltipPayloadItem {
   dataKey: string;
   name: string;
@@ -107,29 +130,8 @@ const renderPieLabel = ({ cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRa
   );
 };
 
-interface VideoItem {
-  id: string;
-  title: string;
-  views: number;
-  recipientCount?: number;
-  [key: string]: any;
-}
-
-interface TimeseriesItem {
-  date: string;
-  views: number;
-  engagement: number;
-  shares: number;
-  [key: string]: any;
-}
-
-interface StatsChartProps {
-  videos?: VideoItem[];
-  timeseries?: TimeseriesItem[];
-}
-
 /* ══════════════════════════════════════════════════════ */
-export default function StatsChart({ videos = [], timeseries = [] }: StatsChartProps) {
+export default function StatsChart({ videos = [], timeseries = [], startDate, endDate }: StatsChartProps) {
 
   /* 1. Stacked bar: views + recipients per video */
   const barData = [...videos]
@@ -294,7 +296,7 @@ export default function StatsChart({ videos = [], timeseries = [] }: StatsChartP
                 label={{ value: 'Eng. %', angle: 90, position: 'insideRight', offset: 12, style: { fontSize: 10, fill: '#9ca3af' } }}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Bar  yAxisId="left"  dataKey="views"   fill={C.teal} radius={[4, 4, 0, 0]} name="Views"      opacity={0.85} />
+              <Bar  yAxisId="left"  dataKey="views"   fill={C.teal} radius={[4, 4, 0, 0]} name="Views"     opacity={0.85} />
               <Line yAxisId="right" dataKey="engRate" stroke={C.rose} strokeWidth={2.5} dot={{ r: 4, fill: C.rose }} name="Eng. Rate %" />
             </ComposedChart>
           </ResponsiveContainer>
