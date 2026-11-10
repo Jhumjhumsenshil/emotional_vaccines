@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, EmailStr, field_validator, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -164,4 +164,37 @@ class VideoResponse(BaseModel):
     tags: List[TagResponse] = [] # 👈 Returns structured tag objects
 
     class Config:
-        from_attributes = True              
+        from_attributes = True   
+
+class CustomerCreate(BaseModel):
+    name: str   
+    email: EmailStr
+    phone: Optional[str] = None
+    customer_type: str
+    organization_id: Optional[int] = None
+    is_active: bool = True
+    
+    video_access: Optional[List[str]] = [] # e.g., ["self_care", "families_thrive"]  
+    notes: Optional[str] = None
+
+class CustomerResponse(BaseModel):
+    id: int
+    name: str    
+    email: str
+    phone: Optional[str] = None
+    customer_type: str
+    organization_id: Optional[int] = Field(default=None, validation_alias='org_id')
+    is_active: bool
+    consumer_token: Optional[str] = None
+    champion_token: Optional[str] = None
+    video_access: Optional[List[str]] = [] # or List[str] depending on how you store it
+    notes: Optional[str] = None
+
+    @field_validator('video_access', mode='before')
+    @classmethod
+    def parse_video_access(cls, v):
+        if not isinstance(v, list):
+            return []
+        return v
+
+    model_config = ConfigDict(from_attributes=True) # Enables ORM mode compatibility for SQLAlchemy                     

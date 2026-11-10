@@ -676,7 +676,12 @@ const loadOrgs = useCallback(async () => {
   };
 
   const openEdit = (o: OrgWithCounts) => {
-    setForm({ name: o.name, description: o.description ?? '', slug: o.slug, logo_url: o.logo_url ?? '', logo_file: null, is_active: o.is_active });
+    const UPLOAD_DIRECTORY = process.env.UPLOAD_DIRECTORY || 'http://localhost:8000';
+  
+  // If o.logo_url exists (e.g., "/static/logos/uuid.png"), prepend backend URL
+  const fullLogoUrl = o.logo_url ? `${UPLOAD_DIRECTORY}${o.logo_url}` : '';
+
+    setForm({ name: o.name, description: o.description ?? '', slug: o.slug, logo_url: fullLogoUrl ?? '', logo_file: null, is_active: o.is_active });
     setFormErrors({});
     setEditOrg(o);
   };
@@ -772,25 +777,26 @@ const loadOrgs = useCallback(async () => {
 
   // ── Edit Organization ──
   const handleEdit = async () => {
-  if (!editOrg || !validateForm(orgs, editOrg.id)) return;
+  if (!editOrg) return;
   setSaving(true);
 
   try {
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 
-    // 1. Send PUT request to FastAPI backend with the organization ID
+    const formData = new FormData();
+    formData.append('name', form.name.trim());
+    formData.append('description', form.description?.trim() || '');
+    formData.append('slug', form.slug.trim());
+    formData.append('is_active', String(form.is_active));
+
+    // Append new file only if the user uploaded a fresh one during edit
+    if (form.logo_file) {
+      formData.append('logo', form.logo_file);
+    }
+
     const response = await fetch(`${API_BASE_URL}/organizations/${editOrg.id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: form.name.trim(),
-        description: form.description?.trim() || null,
-        slug: form.slug.trim(),
-        logo_url: form.logo_url.trim() || null,
-        is_active: form.is_active,
-      }),
+      body: formData, // Do NOT set manual Content-Type headers
     });
 
     if (!response.ok) {
@@ -799,12 +805,8 @@ const loadOrgs = useCallback(async () => {
     }
 
     const updatedOrg = await response.json();
-
-    // 2. Success feedback & UI reset
     showToast(`Organization "${updatedOrg.name}" was updated successfully.`);
     setEditOrg(null);
-
-    // 3. Reload list from backend
     loadOrgs();
   } catch (error: any) {
     console.error('Error updating organization:', error);

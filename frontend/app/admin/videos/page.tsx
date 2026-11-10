@@ -7,27 +7,8 @@ import { Button, Input, Select, Badge } from '../../components/ui/FormComponents
 import Modal from '../../components/ui/Modal';
 
 const AVAILABLE_LANGUAGES = [
-  'English',
-  'Hindi',
-  'Spanish',
-  'French',
-  'German',
-  'Mandarin',
-  'Arabic',
-  'Bengali',
-  'Portuguese',
-  'Russian',
-  'Japanese',
-  'Italian',
-  'Korean',
-  'Telugu',
-  'Tamil',
-  'Marathi',
-  'Gujarati',
-  'Urdu',
-  'Kannada',
-  'Malayalam',
-  'Punjabi',
+  'English',  
+  'Spanish',  
 ];
 
 export default function VideosPage() {
@@ -88,9 +69,9 @@ export default function VideosPage() {
   };
 
   useEffect(() => {
-    setVideos(getMockVideos());
+    //setVideos(getMockVideos());
     //setCategories(getMockCategories());
-    //loadVideos();
+    loadVideos();
     loadCategories();
   }, []);
 
@@ -292,41 +273,53 @@ export default function VideosPage() {
 
 
   // Helper to extract video ID and auto-generate thumbnail URL from YouTube links
-const extractThumbnailFromUrl = (url: string): string => {
-  if (!url) return '';
-  
-  let videoId = '';
-  
-  // Handle standard watch URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)
-  if (url.includes('youtube.com/watch?v=')) {
-    videoId = url.split('v=')[1]?.substring(0, 11);
-  } 
-  // Handle short shared URL (e.g., https://youtu.be/VIDEO_ID)
-  else if (url.includes('youtu.be/')) {
-    videoId = url.split('be/')[1]?.substring(0, 11);
-  }
+  const extractThumbnailFromUrl = async (url: string): Promise<string> => {
+    if (!url) return '';
 
-  if (videoId && videoId.length === 11) {
-    return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-  }
+    // 1. Handle YouTube URLs
+    let videoId = '';
+    if (url.includes('youtube.com/watch?v=')) {
+      videoId = url.split('v=')[1]?.substring(0, 11);
+    } else if (url.includes('youtu.be/')) {
+      videoId = url.split('be/')[1]?.substring(0, 11);
+    }
 
-  return ''; // Return empty if not a recognized platform link
-};
+    if (videoId && videoId.length === 11) {
+      return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    }
+
+    // 2. Handle Vimeo URLs via Vimeo oEmbed API
+    if (url.includes('vimeo.com/')) {
+      try {
+        const response = await fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Returns the highest quality thumbnail URL available from Vimeo
+          return data.thumbnail_url || '';
+        }
+      } catch (error) {
+        console.error('Failed to fetch Vimeo thumbnail:', error);
+      }
+    }
+
+    return '';
+  };
 
 
-const handleUrlChange = (index: number, value: string) => {
-  const updated = [...videoUrls];
-  updated[index] = value;
-  setVideoUrls(updated);
+  // 1. Synchronous handler for instant typing
+  const handleUrlChange = (index: number, url: string) => {
+    const updated = [...videoUrls];
+    updated[index] = url;
+    setVideoUrls(updated);
+  };
 
-  // If it's the primary URL (index 0), try to auto-extract the thumbnail
-  if (index === 0 && (!formData.thumbnail || formData.thumbnail.trim() === '')) {
-    const autoThumb = extractThumbnailFromUrl(value);
+  // 2. Async handler for fetching the thumbnail (trigger this onBlur or after update)
+  const handleUrlBlur = async (url: string) => {
+    const autoThumb = await extractThumbnailFromUrl(url);
     if (autoThumb) {
       setFormData(prev => ({ ...prev, thumbnail: autoThumb }));
     }
-  }
-};
+  };
 
   return (
     <AppLayout title="Video Management">
@@ -578,6 +571,7 @@ const handleUrlChange = (index: number, value: string) => {
                     value={url}
                     placeholder={index === 0 ? "e.g. https://example.com/video.mp4 (Primary URL)" : `URL ${index + 1}`}
                     onChange={e => handleUrlChange(index, e.target.value)}
+                    onBlur={(e) => handleUrlBlur(e.target.value)}
                     className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
                   />
                   {videoUrls.length > 1 && (

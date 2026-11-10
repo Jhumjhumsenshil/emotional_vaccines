@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Table, func, SmallInteger, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Table, func, SmallInteger, Text, JSON
 from sqlalchemy.orm import relationship
 from app.db import Base
 
@@ -120,6 +120,26 @@ class VideoStreamModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     video = relationship("VideoModel", back_populates="streams")
+
+
+class CustomerModel(Base):
+    __tablename__ = "customers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)   
+    email = Column(String, unique=True, index=True, nullable=False)
+    phone = Column(String, nullable=True)
+    customer_type = Column(String, nullable=False)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    is_active = Column(Boolean, default=True)
+
+    video_access = Column(JSON, default=list)
+
+    notes = Column(Text, nullable=True)
+    
+    # 👈 Unique tokens for dynamic secure access links
+    consumer_token = Column(String, unique=True, default=lambda: str(uuid.uuid4()))
+    champion_token = Column(String, unique=True, default=lambda: str(uuid.uuid4()))    
 
 
 

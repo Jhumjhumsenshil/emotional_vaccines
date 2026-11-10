@@ -9,7 +9,14 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app.organizations_api import router as organizations_router
 from app.videos_api import router as videos_router
 from app.categories_api import router as categories_router
+from app.customers_api import router as customer_router
+from app.recipients_api import router as recipients_api
+from app.search_videos_api import router as search_videos_api
+
 from fastapi.staticfiles import StaticFiles
+from fastapi import Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.db import get_db
 from app.models import User, Role, Permission
@@ -25,6 +32,9 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 app.include_router(organizations_router)
 app.include_router(videos_router)
 app.include_router(categories_router)
+app.include_router(customer_router)
+app.include_router(recipients_api)
+app.include_router(search_videos_api)
 
 # Enable CORS for frontend interactions
 app.add_middleware(
@@ -502,3 +512,10 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"message": f"User {user.name} ({user.username}) was deleted."}
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print("Validation Error:", exc.errors())
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body},
+    )

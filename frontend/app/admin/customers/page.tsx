@@ -15,22 +15,22 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface BackendUserItem {
-  id: number;
-  name: string;
-  username: string;
-  email: string;
-  status: string; // 'pending' | 'approved'
-  is_active: boolean;
-  role: string | null;
-  role_id: number | null;
-  created_at: string | null;
-}
+// interface BackendUserItem {
+//   id: number;
+//   name: string;
+//   username: string;
+//   email: string;
+//   status: string; // 'pending' | 'approved'
+//   is_active: boolean;
+//   role: string | null;
+//   role_id: number | null;
+//   created_at: string | null;
+// }
 
 export interface CustomerItem {
   id: number;
-  name: string;
-  username: string;
+  name: string;  
+  //username: string;
   email: string;
   status: string; // 'pending' | 'approved'
   is_active: boolean;
@@ -42,6 +42,8 @@ export interface CustomerItem {
   organizationId: number | null;
   organizationName: string | null;
   phoneNumber: string;
+  video_access: [];
+  notes: string;
 }
 
 type SortField = 'id' | 'name' | 'email' | 'customerType' | 'organization' | 'created_at' | 'status';
@@ -49,23 +51,24 @@ type SortDir = 'asc' | 'desc';
 type CustomerFilter = 'all' | 'active' | 'pending' | 'inactive' | 'direct' | 'organization';
 
 interface CustomerFormData {
-  name: string;
+  name: string;  
   email: string;
   phone: string;
   customerType: CustomerType;
   organizationId: string; // ID string for <select>, or empty for direct customer
-  status: 'active' | 'pending' | 'inactive';
-  username?: string;
-  password?: string;
+  status: 'active' | 'pending' | 'inactive';  
+  //password?: string;
+  video_access: string[];
+  notes: string;
 }
 
 interface FormErrors {
-  name?: string;
+  name?: string;  
   email?: string;
   phone?: string;
   organizationId?: string;
-  username?: string;
-  password?: string;
+  //username?: string;
+  //password?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -108,6 +111,8 @@ function avatarColor(name: string): string {
   const idx = name.charCodeAt(0) % colors.length;
   return colors[idx];
 }
+
+
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -273,7 +278,7 @@ function CustomerDetailView({ customer }: { customer: CustomerItem }) {
           },
           { label: 'Phone Number', value: customer.phoneNumber || '—' },
           { label: 'Email Address', value: customer.email },
-          { label: 'Username', value: `@${customer.username}` },
+          //{ label: 'Username', value: `@${customer.username}` },
           { label: 'Registration Date', value: formatDate(customer.created_at) },
           {
             label: 'Account Status',
@@ -345,6 +350,7 @@ function CustomerFormPanel({
   isEdit,
   saving,
   onChange,
+  onVideoAccessChange,
   onSubmit,
   onCancel,
 }: {
@@ -354,6 +360,7 @@ function CustomerFormPanel({
   isEdit: boolean;
   saving: boolean;
   onChange: (field: keyof CustomerFormData, value: string) => void;
+  onVideoAccessChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
 }) {
@@ -365,7 +372,7 @@ function CustomerFormPanel({
         {/* Customer Name */}
         <Input
           id="customer-form-name"
-          label="Customer Name *"
+          label="Customer First Name *"
           placeholder="e.g. Jane Smith"
           value={form.name}
           onChange={(e) => onChange('name', e.target.value)}
@@ -413,6 +420,7 @@ function CustomerFormPanel({
               value={form.organizationId}
               onChange={(e) => onChange('organizationId', e.target.value)}
               error={errors.organizationId}
+              disabled={!!isEdit}
             >
               <option value="">— Select an Organization —</option>
               {organizations.map((org) => (
@@ -438,7 +446,75 @@ function CustomerFormPanel({
           </div>
         )}
 
+        
+
+        {/* Video Access Categories */}
+        <div style={{ gridColumn: '1 / -1', marginBottom: '1rem' }}>
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+            Video Access *
+          </label>
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={form.video_access.includes("self_care")}
+                onChange={() => onVideoAccessChange("self_care")}
+                 style={{ width: 16, height: 16, accentColor: 'var(--primary-color, #6366f1)', cursor: 'pointer' }}
+              />
+              Self Care
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={form.video_access.includes("families_thrive")}
+                onChange={() => onVideoAccessChange("families_thrive")}
+                 style={{ width: 16, height: 16, accentColor: 'var(--primary-color, #6366f1)', cursor: 'pointer' }}
+              />
+              Families Thrive
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={form.video_access.includes("youth_to_youth")}
+                onChange={() => onVideoAccessChange("youth_to_youth")}
+                 style={{ width: 16, height: 16, accentColor: 'var(--primary-color, #6366f1)', cursor: 'pointer' }}
+              />
+              Youth to Youth
+            </label>
+
+          </div>
+
+          
+        </div>
+        {/* Notes Textarea */}
+        <div style={{ gridColumn: '1 / -1', marginBottom: '1rem' }}>
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+            Customer Notes
+          </label>
+          <textarea
+            id="customer-form-notes"
+            placeholder="Add internal notes or comments about this customer..."
+            value={form.notes}
+            onChange={(e) => onChange('notes', e.target.value)}
+            rows={3}
+            style={{
+              width: '100%',
+              padding: '0.65rem 0.875rem',
+              borderRadius: '6px',
+              border: '1px solid var(--border-color)',
+              background: 'var(--card-bg, #fff)',
+              color: 'var(--text-main)',
+              fontSize: '0.875rem',
+              outline: 'none',
+              resize: 'vertical',
+            }}
+          />
+        </div>
         {/* Account Status */}
+        <div style={{ gridColumn: '1 / -1', marginBottom: '1rem' }}>
         <Select
           id="customer-form-status"
           label="Account Status *"
@@ -449,29 +525,8 @@ function CustomerFormPanel({
           <option value="pending">Pending</option>
           <option value="inactive">Inactive</option>
         </Select>
-
-        {/* In Add Mode: Password & Optional Username */}
-        {!isEdit && (
-          <Input
-            id="customer-form-password"
-            label="Password *"
-            type="password"
-            placeholder="Minimum 8 characters"
-            value={form.password || ''}
-            onChange={(e) => onChange('password', e.target.value)}
-            error={errors.password}
-          />
-        )}
-
-        {/* In Edit Mode: Username (disabled display) */}
-        {isEdit && (
-          <Input
-            id="customer-form-username-disabled"
-            label="Username"
-            value={form.username || ''}
-            disabled
-          />
-        )}
+       </div>     
+      
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
@@ -487,6 +542,7 @@ function CustomerFormPanel({
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
+
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
@@ -507,19 +563,31 @@ export default function CustomersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Form state
-  const emptyForm: CustomerFormData = {
-    name: '',
+  const customerForm: CustomerFormData = {
+    name: '',    
     email: '',
     phone: '',
     customerType: 'Direct Customer',
     organizationId: '',
     status: 'active',
-    username: '',
-    password: '',
+    video_access: [],
+    notes: '',
   };
-  const [form, setForm] = useState<CustomerFormData>(emptyForm);
+  const [form, setForm] = useState<CustomerFormData>(customerForm);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
+
+
+    const handleCheckboxChange = (value: string) => {
+    setForm((prev) => {
+      const currentList = prev.video_access || [];
+      const updatedList = currentList.includes(value)
+        ? currentList.filter((item) => item !== value) // Remove if already checked
+        : [...currentList, value]; // Add if unchecked
+
+      return { ...prev, video_access: updatedList };
+    });
+  };
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -529,59 +597,68 @@ export default function CustomersPage() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
-  // ── Data Fetching ──
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      // 1. Fetch available organizations from organization service
-      const orgList = getOrganizations();
-      setOrganizations(orgList);
-
-      // 2. Fetch users from API
-      const usersRes = await fetch('/api/admin/users');
-      if (usersRes.ok) {
-        const usersData: BackendUserItem[] = await usersRes.json();
-        const metaMap = getCustomerMetaMap();
-
-        // Merge users with their organization metadata
-        const mergedCustomers: CustomerItem[] = usersData.map((u) => {
-          const meta = metaMap[u.id];
-          let cType: CustomerType = meta?.customerType || 'Direct Customer';
-          let orgId = meta?.organizationId ?? null;
-          let orgName = meta?.organizationName ?? null;
-          let phone = meta?.phoneNumber || '';
-
-          // If orgId is present, verify org name from current org list
-          if (orgId) {
-            const matchedOrg = orgList.find((o) => o.id === orgId);
-            if (matchedOrg) {
-              orgName = matchedOrg.name;
+      useEffect(() => {
+        async function fetchOrgs() {
+          try {
+            const res = await fetch('http://localhost:8000/api/organizations');
+            if (res.ok) {
+              const data = await res.json();
+              setOrganizations(data);
             }
+          } catch (err) {
+            console.error('Failed to load organizations', err);
           }
+        }
+        fetchOrgs();
+      }, []);
 
-          return {
-            ...u,
-            customerType: cType,
-            organizationId: cType === 'Organization-Based Customer' ? orgId : null,
-            organizationName: cType === 'Organization-Based Customer' ? orgName : null,
-            phoneNumber: phone,
-          };
-        });
+  // ── Data Fetching ──
 
-        setCustomers(mergedCustomers);
-      } else {
-        showToast('Failed to load customer records', 'error');
-      }
-    } catch {
-      showToast('Network error while connecting to server', 'error');
-    } finally {
-      setLoading(false);
+  const fetchData = useCallback(async () => {
+  try {
+    setLoading(true);
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+    
+    const res = await fetch(`${API_BASE_URL}/customers`);
+    if (res.ok) {
+      const data = await res.json();
+      
+      // Map backend response fields to match your frontend CustomerItem interface
+      const formattedCustomers: CustomerItem[] = data.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        //username: c.email.split('@')[0], // fallback username from email if needed
+        email: c.email,
+        status: c.is_active ? 'approved' : 'inactive',
+        is_active: c.is_active,
+        role: null,
+        role_id: null,
+        created_at: c.created_at || new Date().toISOString(),
+        customerType: c.customer_type,
+        organizationId: c.organization_id ?? c.org_id ?? null,
+        organizationName: null, // Optional: map org name if loaded from org list
+        phoneNumber: c.phone || '',
+        video_access: c.video_access || [],
+        notes: c.notes || '',
+      }));
+
+      setCustomers(formattedCustomers);
+    } else {
+      showToast('Failed to load customer records', 'error');
     }
-  }, [showToast]);
+  } catch (err) {
+    console.error(err);
+    showToast('Network error while connecting to server', 'error');
+  } finally {
+    setLoading(false);
+  }
+}, [showToast]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+useEffect(() => {
+  fetchData();
+}, [fetchData]);
+
+ 
 
   // ── Overview Statistics ──
   const totalCount = customers.length;
@@ -599,7 +676,7 @@ export default function CustomersPage() {
         !q ||
         c.name.toLowerCase().includes(q) ||
         c.email.toLowerCase().includes(q) ||
-        c.username.toLowerCase().includes(q) ||
+        //c.username.toLowerCase().includes(q) ||
         String(c.id).includes(q) ||
         c.customerType.toLowerCase().includes(q) ||
         (c.organizationName ?? '').toLowerCase().includes(q) ||
@@ -652,21 +729,22 @@ export default function CustomersPage() {
 
   // ── Form helpers ──
   const openAdd = () => {
-    setForm(emptyForm);
+    setForm(customerForm);
     setFormErrors({});
     setShowAddModal(true);
   };
 
   const openEdit = (c: CustomerItem) => {
+    
     setForm({
-      name: c.name,
+      name: c.name,      
       email: c.email,
       phone: c.phoneNumber || '',
       customerType: c.customerType,
-      organizationId: c.organizationId ? c.organizationId.toString() : '',
+      organizationId: c.organizationId !== null && c.organizationId !== undefined ? String(c.organizationId) : '',
       status: getAccountStatus(c),
-      username: c.username,
-      password: '',
+      video_access:c.video_access,
+      notes: c.notes,
     });
     setFormErrors({});
     setEditCustomer(c);
@@ -697,134 +775,176 @@ export default function CustomersPage() {
       }
     }
 
-    if (!isEdit) {
-      if (!form.password || !form.password.trim()) {
-        errs.password = 'Password is required.';
-      } else if (form.password.length < 8) {
-        errs.password = 'Password must be at least 8 characters.';
-      }
-    }
+    // if (!isEdit) {
+    //   if (!form.password || !form.password.trim()) {
+    //     errs.password = 'Password is required.';
+    //   } else if (form.password.length < 8) {
+    //     errs.password = 'Password must be at least 8 characters.';
+    //   }
+    // }
 
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
+
+  
+
+
+
   // ── Add Customer ──
   const handleAddCustomer = async () => {
-    if (!validateForm(false)) return;
-    setSaving(true);
-    try {
-      const desiredUsername = form.username?.trim() || form.email.split('@')[0].trim();
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim(),
-          username: desiredUsername,
-          password: form.password,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to create customer');
-
-      const newUserId: number = data.user?.id;
-
-      // Update account status if specified
-      if (newUserId && form.status !== 'pending') {
-        await fetch(`/api/admin/users/${newUserId}/status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            is_active: form.status === 'active',
-            status: form.status === 'active' ? 'approved' : 'pending',
-          }),
-        });
-      }
-
-      // Persist customer organization metadata
-      const selectedOrg = organizations.find((o) => o.id === Number(form.organizationId));
-      saveCustomerMeta({
-        customerId: newUserId,
-        customerType: form.customerType,
-        organizationId: form.customerType === 'Organization-Based Customer' ? Number(form.organizationId) : null,
-        organizationName: form.customerType === 'Organization-Based Customer' ? (selectedOrg?.name ?? null) : null,
-        phoneNumber: form.phone.trim(),
-        accountStatus: form.status,
-      });
-
-      showToast(`Customer "${form.name}" was successfully added.`);
-      setShowAddModal(false);
-      fetchData();
-    } catch (err: unknown) {
-      showToast((err as Error).message || 'Failed to add customer.', 'error');
-    } finally {
-      setSaving(false);
+    console.log("handleAddCustomer triggered!");
+  if (!validateForm(false)) {
+      console.log("Validation failed:", formErrors); // 👈 See what failed validation
+      return;
     }
-  };
+    
+    setSaving(true);
+  
+  try {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+
+    // 1. Send the full customer profile directly to your customer endpoint
+    const res = await fetch(`${API_BASE_URL}/customers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name.trim(),        
+        email: form.email.trim(),
+        phone: form.phone?.trim() || '',
+        customer_type: form.customerType,
+        organization_id: form.customerType === 'Organization-Based Customer' && form.organizationId 
+          ? Number(form.organizationId) 
+          : null,
+        is_active: form.status === 'active',
+        notes: form.notes?.trim() || '',
+        video_access: form.video_access || [], // Pass the selected video categories array
+      }),
+
+      
+    });
+
+    console.log("Submitting payload:", {
+  name: form.name,
+  email: form.email,
+  video_access: form.video_access, // Check what prints in your browser console here
+});
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to create customer');
+
+    showToast(`Customer "${form.name}" was successfully added.`);
+    setShowAddModal(false);
+    fetchData(); // Refresh your table data
+  } catch (err: unknown) {
+    showToast((err as Error).message || 'Failed to add customer.', 'error');
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ── Edit Customer ──
+  // const handleEditCustomer = async () => {
+  //   if (!editCustomer || !validateForm(true)) return;
+  //   setSaving(true);
+  //   try {
+  //     const id = editCustomer.id;
+
+  //     // Update status if changed
+  //     const currentStatus = getAccountStatus(editCustomer);
+  //     if (currentStatus !== form.status) {
+  //       await fetch(`/api/admin/users/${id}/status`, {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         body: JSON.stringify({
+  //           is_active: form.status !== 'inactive',
+  //           status: form.status === 'active' ? 'approved' : 'pending',
+  //         }),
+  //       });
+  //     }
+
+  //     // Save updated organization and profile metadata
+  //     const selectedOrg = organizations.find((o) => o.id === Number(form.organizationId));
+  //     const orgId = form.customerType === 'Organization-Based Customer' ? Number(form.organizationId) : null;
+  //     const orgName = form.customerType === 'Organization-Based Customer' ? (selectedOrg?.name ?? null) : null;
+
+  //     saveCustomerMeta({
+  //       customerId: id,
+  //       customerType: form.customerType,
+  //       organizationId: orgId,
+  //       organizationName: orgName,
+  //       phoneNumber: form.phone.trim(),
+  //       accountStatus: form.status,
+  //     });
+
+  //     // Update local state immediately
+  //     setCustomers((prev) =>
+  //       prev.map((c) =>
+  //         c.id === id
+  //           ? {
+  //               ...c,
+  //               name: form.name.trim(),
+  //               email: form.email.trim(),
+  //               phoneNumber: form.phone.trim(),
+  //               customerType: form.customerType,
+  //               organizationId: orgId,
+  //               organizationName: orgName,
+  //               is_active: form.status !== 'inactive',
+  //               status: form.status === 'active' ? 'approved' : 'pending',
+  //             }
+  //           : c
+  //       )
+  //     );
+
+  //     showToast(`Customer "${form.name}" was successfully updated.`);
+  //     setEditCustomer(null);
+  //   } catch (err: unknown) {
+  //     showToast((err as Error).message || 'Failed to update customer.', 'error');
+  //   } finally {
+  //     setSaving(false);
+  //   }
+  // };
+
   const handleEditCustomer = async () => {
     if (!editCustomer || !validateForm(true)) return;
     setSaving(true);
+    
     try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
       const id = editCustomer.id;
 
-      // Update status if changed
-      const currentStatus = getAccountStatus(editCustomer);
-      if (currentStatus !== form.status) {
-        await fetch(`/api/admin/users/${id}/status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            is_active: form.status !== 'inactive',
-            status: form.status === 'active' ? 'approved' : 'pending',
-          }),
-        });
-      }
-
-      // Save updated organization and profile metadata
-      const selectedOrg = organizations.find((o) => o.id === Number(form.organizationId));
-      const orgId = form.customerType === 'Organization-Based Customer' ? Number(form.organizationId) : null;
-      const orgName = form.customerType === 'Organization-Based Customer' ? (selectedOrg?.name ?? null) : null;
-
-      saveCustomerMeta({
-        customerId: id,
-        customerType: form.customerType,
-        organizationId: orgId,
-        organizationName: orgName,
-        phoneNumber: form.phone.trim(),
-        accountStatus: form.status,
+      const res = await fetch(`${API_BASE_URL}/customers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),        
+          email: form.email.trim(),
+          phone: form.phone?.trim() || '',
+          customer_type: form.customerType,
+          organization_id: form.customerType === 'Organization-Based Customer' && form.organizationId 
+            ? Number(form.organizationId) 
+            : null,
+          is_active: form.status === 'active',
+          video_access: form.video_access || [],
+          notes: form.notes?.trim() || '',
+        }),
       });
 
-      // Update local state immediately
-      setCustomers((prev) =>
-        prev.map((c) =>
-          c.id === id
-            ? {
-                ...c,
-                name: form.name.trim(),
-                email: form.email.trim(),
-                phoneNumber: form.phone.trim(),
-                customerType: form.customerType,
-                organizationId: orgId,
-                organizationName: orgName,
-                is_active: form.status !== 'inactive',
-                status: form.status === 'active' ? 'approved' : 'pending',
-              }
-            : c
-        )
-      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to update customer');
 
       showToast(`Customer "${form.name}" was successfully updated.`);
       setEditCustomer(null);
+      
+      // Refresh your table list if you have fetchData implemented
+      // fetchData(); 
     } catch (err: unknown) {
       showToast((err as Error).message || 'Failed to update customer.', 'error');
     } finally {
       setSaving(false);
     }
   };
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -1305,6 +1425,7 @@ export default function CustomersPage() {
           isEdit={false}
           saving={saving}
           onChange={updateForm}
+          onVideoAccessChange={handleCheckboxChange}
           onSubmit={handleAddCustomer}
           onCancel={() => setShowAddModal(false)}
         />
@@ -1324,6 +1445,7 @@ export default function CustomersPage() {
           isEdit={true}
           saving={saving}
           onChange={updateForm}
+          onVideoAccessChange={handleCheckboxChange}
           onSubmit={handleEditCustomer}
           onCancel={() => setEditCustomer(null)}
         />

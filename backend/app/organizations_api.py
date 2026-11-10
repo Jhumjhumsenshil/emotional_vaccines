@@ -75,14 +75,58 @@ def create_organization(
 
 # 3. Update an Organization
 @router.put("/{org_id}", response_model=schemas.OrganizationResponse)
-def update_organization(org_id: int, org: schemas.OrganizationUpdate, db: Session = Depends(get_db)):
+def update_organization(
+    org_id: int,
+    name: str = Form(None),
+    slug: str = Form(None),
+    description: str = Form(None),
+    is_active: bool = Form(None),
+    logo: UploadFile = File(None), # Optional new logo file upload
+    db: Session = Depends(get_db)
+):
+    # 1. Fetch existing organization
     db_org = db.query(models.OrganizationModel).filter(models.OrganizationModel.id == org_id).first()
     if not db_org:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    for key, value in org.dict(exclude_unset=True).items():
-        setattr(db_org, key, value)
-    
+    # 2. Check slug uniqueness if it's being updated
+    if slug and slug != db_org.slug:
+        existing = db.query(models.OrganizationModel).filter(models.OrganizationModel.slug == slug).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Slug '{slug}' is already in use.")
+
+    # 3. Update text fields only if they are provided
+    if name is not None:
+        db_org.name = name
+    if slug is not None:
+        db_org.slug = slug
+    if description is not None:
+        db_org.description = description
+    if is_active is not None:
+        db_org.is_active = is_active
+
+    # 4. Handle optional new logo file upload
+    if logo is not None:
+        ext = logo.filename.split(".")[-1].lower()
+        if ext not in ["png", "jpeg", "jpg", "svg"]:
+            raise HTTPException(status_code=400, detail="Invalid image format. Allowed: PNG, JPEG, SVG")
+
+        # Generate unique filename to avoid naming conflicts
+        unique_filename = f"{uuid.uuid4()}.{ext}"
+        file_path = UPLOAD_DIR / unique_filename
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(logo.file, buffer)
+        
+        # Optional: Delete old logo file from disk if it exists
+        if db_org.logo_url:
+            old_file_path = Path("uploads" / Path(db_org.logo_url.replace("/static", "")))
+            if old_file_path.exists():
+                old_file_path.unlink(missing_ok=True)
+
+        # Save relative path to database
+        db_org.logo_url = f"/static/logos/{unique_filename}"
+
     db.commit()
     db.refresh(db_org)
     return db_org
