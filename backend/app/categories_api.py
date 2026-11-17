@@ -36,7 +36,7 @@ def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_
     return new_category
 
 
-@router.get("", response_model=List[schemas.CategoryOut], dependencies=[Depends(verify_access_token)])
+@router.get("", response_model=List[schemas.CategoryOut])
 def get_categories(db: Session = Depends(get_db)):
     return db.query(models.Category).all()
 

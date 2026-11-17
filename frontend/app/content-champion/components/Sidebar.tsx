@@ -55,12 +55,11 @@ export default function Sidebar({
   }, []);
 
   return (
-    <aside style={{ width: '260px', height: '100vh', display: 'flex', flexDirection: 'column', borderRight: '1px solid #e5e7eb', backgroundColor: '#fff', overflowY: 'auto' }}>
+    <aside style={{ width: '260px', height: '100vh', display: 'flex', flexDirection: 'column', borderRight: '1px solid #e5e7eb', backgroundColor: '#fff', overflowY: 'auto', paddingBottom:'10%'}}>
       {/* Brand */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-      
         borderBottom: '1px solid #f3f4f6',
         justifyContent: 'space-between',
       }}>

@@ -672,6 +672,7 @@ img {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
+  margin-bottom:200px;
 }
 
 .video-table-header {
@@ -870,6 +871,7 @@ img {
   justify-content: space-between;
   padding: 10px 28px;
   z-index: 30;
+  width:calc(100% - 260px);
 }
 
 .footer-attendees {
