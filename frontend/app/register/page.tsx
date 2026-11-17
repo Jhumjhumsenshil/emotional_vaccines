@@ -15,6 +15,8 @@ export default function RegisterPage() {
   const [registeredSuccess, setRegisteredSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
@@ -28,7 +30,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

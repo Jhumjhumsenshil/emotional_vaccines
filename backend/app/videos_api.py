@@ -227,9 +227,23 @@ def save_champion_video(token: str, payload: ChampionVideoCreate, db: Session = 
 @router.get("/champions/{token}/videos")
 def get_champion_videos(token: str, db: Session = Depends(get_db)):
     # Lookup customer by token or ID (adjust filter if passing customer.id)
-    customer = db.query(CustomerModel).filter(
-        (CustomerModel.id == token) | (CustomerModel.id == int(token) if token.isdigit() else False)
-    ).first()
+    # customer = db.query(CustomerModel).filter(
+    #     (CustomerModel.id == token) | (CustomerModel.id == int(token) if token.isdigit() else False)
+    # ).first()
+
+    if token.isdigit():
+    # If it's a number, check ID as an integer, plus tokens
+        customer = db.query(CustomerModel).filter(
+            (CustomerModel.id == int(token)) | 
+            (CustomerModel.consumer_token == token) | 
+            (CustomerModel.champion_token == token)
+        ).first()
+    else:
+        # If it's a text token, only check token columns
+        customer = db.query(CustomerModel).filter(
+            (CustomerModel.consumer_token == token) | 
+            (CustomerModel.champion_token == token)
+        ).first()
     
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
