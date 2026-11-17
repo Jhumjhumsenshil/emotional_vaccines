@@ -181,7 +181,7 @@ def login_user(credentials: LoginSchema, db: Session = Depends(get_db)):
 
     # 4. Check approval status / role assignment
     # Users with status 'pending' or without any role cannot log in yet
-    user_role = user.roles[0].name if user.roles else None
+    user_role = user.roles[0].name if (user.roles and len(user.roles) > 0) else None
     if user.status == "pending" or not user_role:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
