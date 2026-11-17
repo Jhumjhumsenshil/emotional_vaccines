@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Table, func, SmallInteger, Text, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Table, func, SmallInteger, Text, JSON, Float, UniqueConstraint
+from datetime import datetime
 from sqlalchemy.orm import relationship
 from app.db import Base
 
@@ -51,6 +52,16 @@ class User(Base):
 
     roles = relationship("Role", secondary=user_roles, back_populates="users")
 
+
+
+    
+video_category_association = Table(
+    "video_category",
+    Base.metadata,
+    Column("video_id", Integer, ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True),
+    Column("category_id", Integer, ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True)
+)
+
 class Category(Base):
     __tablename__ = "categories"
 
@@ -58,7 +69,10 @@ class Category(Base):
     name = Column(String, unique=True, nullable=False, index=True)
     description = Column(Text, nullable=True)
     slug = Column(String, nullable = True)
-    status = Column(SmallInteger, nullable=False)    
+    status = Column(SmallInteger, nullable=False)  
+
+    # Many-to-many relationship mapping
+    videos = relationship("VideoModel", secondary=video_category_association, back_populates="categories")  
 
 
 class OrganizationModel(Base):
@@ -82,6 +96,9 @@ video_tag_association = Table(
 
 
 
+
+
+
 class TagModel(Base):
     __tablename__ = "tags"
 
@@ -100,12 +117,15 @@ class VideoModel(Base):
     duration_seconds = Column(Integer, nullable=False, default=0)
     default_thumbnail_url = Column(Text, nullable=True)
     is_published = Column(Boolean, nullable=False, default=True)
+    is_default = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationship to streams
     streams = relationship("VideoStreamModel", back_populates="video", cascade="all, delete-orphan")
 
     tags = relationship("TagModel", secondary=video_tag_association, back_populates="videos")
+
+    categories = relationship("Category", secondary=video_category_association, back_populates="videos")
 
 
 class VideoStreamModel(Base):
@@ -139,7 +159,32 @@ class CustomerModel(Base):
     
     # 👈 Unique tokens for dynamic secure access links
     consumer_token = Column(String, unique=True, default=lambda: str(uuid.uuid4()))
-    champion_token = Column(String, unique=True, default=lambda: str(uuid.uuid4()))    
+    champion_token = Column(String, unique=True, default=lambda: str(uuid.uuid4()))  
+
+
+    selected_videos = relationship("ChampionVideoModel", back_populates="customer", cascade="all, delete-orphan") 
+
+
+
+class ChampionVideoModel(Base):
+    __tablename__ = "champion_videos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    video_id = Column(Integer, ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
+
+    rating = Column(Float, default=0.0)
+    selected_language = Column(String, default="EN")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Optional: Ensure a champion can't duplicate the same video entry
+    __table_args__ = (
+        UniqueConstraint('customer_id', 'video_id', name='uq_champion_video'),
+    )
+
+    # Relationships (adjust model names to match your existing codebase)
+    customer = relationship("CustomerModel", back_populates="selected_videos")
+    video = relationship("VideoModel") 
 
 
 

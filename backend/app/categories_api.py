@@ -5,9 +5,11 @@ from typing import List
 from app.db import get_db
 from app import models, schemas
 
+from app.auth import verify_access_token
+
 router = APIRouter(prefix="/api/categories", tags=["Categories"])
 
-@router.post("", response_model=schemas.CategoryOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.CategoryOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_access_token)])
 def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db)):
     # 1. Check if category name already exists
     existing_category = db.query(models.Category).filter(
@@ -34,12 +36,12 @@ def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_
     return new_category
 
 
-@router.get("", response_model=List[schemas.CategoryOut])
+@router.get("", response_model=List[schemas.CategoryOut], dependencies=[Depends(verify_access_token)])
 def get_categories(db: Session = Depends(get_db)):
     return db.query(models.Category).all()
 
 
-@router.put("/{category_id}", response_model=schemas.CategoryOut)
+@router.put("/{category_id}", response_model=schemas.CategoryOut, dependencies=[Depends(verify_access_token)])
 def update_category(
     category_id: int, 
     category_data: schemas.CategoryUpdate, 

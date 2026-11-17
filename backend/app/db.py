@@ -55,7 +55,7 @@ engine = create_engine(
     pool_recycle=300,
 )
 
-print("CURRENT DB URL BEING USED:", engine.url)
+# print("CURRENT DB URL BEING USED:", engine.url)
 
 SessionLocal = sessionmaker(
     autocommit=False,

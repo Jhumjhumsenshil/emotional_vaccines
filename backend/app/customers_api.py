@@ -2,6 +2,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
+from app.auth import verify_access_token
 
 from app.db import get_db
 from app import models, schemas
@@ -9,7 +10,7 @@ from app.utils.email import send_champion_email
 
 router = APIRouter(prefix="/api/customers", tags=["Customers"])
 
-@router.get("", response_model=List[schemas.CustomerResponse])
+@router.get("", response_model=List[schemas.CustomerResponse], dependencies=[Depends(verify_access_token)],)
 def get_customers(db: Session = Depends(get_db)):
     customers = db.query(models.CustomerModel).all()
     return customers

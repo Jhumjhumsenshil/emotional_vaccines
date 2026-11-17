@@ -12,6 +12,7 @@ interface Champion {
 }
 
 interface HeaderProps {
+  logoImg?: string;
   activeTab: string;
   setActiveTab: (tabId: string) => void;
   queueCount?: number;
@@ -19,7 +20,8 @@ interface HeaderProps {
   champion?: Champion;
 }
 
-export default function Header({ activeTab, setActiveTab, queueCount = 0, onMenuClick, champion }: HeaderProps) {
+export default function Header({ activeTab, setActiveTab, queueCount = 0, onMenuClick, champion, logoImg = '', }: HeaderProps) {
+   
   const tabs = [
     { id: 'videos',     label: 'Search Videos',        badge: null },
     { id: 'recipients', label: 'Videos for My Recipients', badge: queueCount },
@@ -31,8 +33,28 @@ export default function Header({ activeTab, setActiveTab, queueCount = 0, onMenu
 
   return (
     <header className="app-header">
+        
       {/* Top title & profile row */}
       <div className="header-title-bar">
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {logoImg && (
+            <img
+              src={logoImg}
+              alt="Emotional Vaccines Logo"
+              style={{ width: 38, height: 38, objectFit: 'contain', flexShrink: 0, display: 'block' }}
+            />
+          )}
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#4a4a4a', lineHeight: 1.2, letterSpacing: '-0.01em' }}>
+              Emotional<br />
+              Vaccines<sup style={{ fontSize: 9, verticalAlign: 'super', fontWeight: 500, color: '#9ca3af' }}>®</sup>
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 400, color: '#9ca3af', letterSpacing: '0.01em', marginTop: 3 }}>
+              Resiliency Education
+            </div>
+          </div>
+        </div>
         <div className="header-title-left">
           {/* Hamburger — mobile only */}
           <button

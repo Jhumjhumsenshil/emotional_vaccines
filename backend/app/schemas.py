@@ -63,6 +63,15 @@ class CategoryOut(BaseModel):
         from_attributes = True  
 
 
+class CategoryResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class OrganizationBase(BaseModel):
     name: str
     description: Optional[str] = None
@@ -102,14 +111,14 @@ class VideoStreamResponse(VideoStreamCreate):
     class Config:
         from_attributes = True
 
-class VideoCreate(BaseModel):
-    category_id: Optional[int] = None
-    default_title: str
-    default_description: Optional[str] = None
-    duration_seconds: int = 0
-    default_thumbnail_url: Optional[str] = None
-    is_published: bool = True
-    streams: List[VideoStreamCreate] = []
+# class VideoCreate(BaseModel):
+#     category_id: Optional[int] = None
+#     default_title: str
+#     default_description: Optional[str] = None
+#     duration_seconds: int = 0
+#     default_thumbnail_url: Optional[str] = None
+#     is_published: bool = True
+#     streams: List[VideoStreamCreate] = []
 
 class VideoUpdate(BaseModel):
     category_id: Optional[int] = None
@@ -118,21 +127,22 @@ class VideoUpdate(BaseModel):
     duration_seconds: Optional[int] = None
     default_thumbnail_url: Optional[str] = None
     is_published: Optional[bool] = None
+    is_default: Optional[bool] = None
     streams: Optional[List[VideoStreamCreate]] = None
 
-class VideoResponse(BaseModel):
-    id: int
-    category_id: Optional[int] = None
-    default_title: str
-    default_description: Optional[str] = None
-    duration_seconds: int
-    default_thumbnail_url: Optional[str] = None
-    is_published: bool
-    created_at: Optional[datetime] = None
-    streams: List[VideoStreamResponse] = []
+# class VideoResponse(BaseModel):
+#     id: int
+#     category_id: Optional[int] = None
+#     default_title: str
+#     default_description: Optional[str] = None
+#     duration_seconds: int
+#     default_thumbnail_url: Optional[str] = None
+#     is_published: bool
+#     created_at: Optional[datetime] = None
+#     streams: List[VideoStreamResponse] = []
 
-    class Config:
-        from_attributes = True  
+#     class Config:
+#         from_attributes = True  
 
 class TagResponse(BaseModel):
     id: int
@@ -143,28 +153,34 @@ class TagResponse(BaseModel):
 
 # Update VideoCreate & VideoResponse to handle tags
 class VideoCreate(BaseModel):
-    category_id: Optional[int] = None
+    category_ids: List[int] = []
     default_title: str
     default_description: Optional[str] = None
     duration_seconds: int = 0
     default_thumbnail_url: Optional[str] = None
     is_published: bool = True
+    is_default: bool = True
     streams: List[VideoStreamCreate] = []
     tags: List[str] = [] # 👈 Accepts list of tag strings from frontend
 
 class VideoResponse(BaseModel):
     id: int
     category_id: Optional[int] = None
+    categories: List[CategoryResponse] = []
     default_title: str
     default_description: Optional[str] = None
     duration_seconds: int
     default_thumbnail_url: Optional[str] = None
     is_published: bool
+    is_default: Optional[bool] = False
     streams: List[VideoStreamResponse] = []
     tags: List[TagResponse] = [] # 👈 Returns structured tag objects
 
     class Config:
         from_attributes = True   
+
+class VideoPublishUpdate(BaseModel):
+    is_published: bool
 
 class CustomerCreate(BaseModel):
     name: str   
@@ -174,7 +190,7 @@ class CustomerCreate(BaseModel):
     organization_id: Optional[int] = None
     is_active: bool = True
     
-    video_access: Optional[List[str]] = [] # e.g., ["self_care", "families_thrive"]  
+    video_access: Optional[List[int]] = [] # e.g., ["self_care", "families_thrive"]  
     notes: Optional[str] = None
 
 class CustomerResponse(BaseModel):
@@ -187,7 +203,7 @@ class CustomerResponse(BaseModel):
     is_active: bool
     consumer_token: Optional[str] = None
     champion_token: Optional[str] = None
-    video_access: Optional[List[str]] = [] # or List[str] depending on how you store it
+    video_access: Optional[List[int]] = [] # or List[str] depending on how you store it
     notes: Optional[str] = None
 
     @field_validator('video_access', mode='before')
@@ -197,4 +213,26 @@ class CustomerResponse(BaseModel):
             return []
         return v
 
-    model_config = ConfigDict(from_attributes=True) # Enables ORM mode compatibility for SQLAlchemy                     
+    model_config = ConfigDict(from_attributes=True) # Enables ORM mode compatibility for SQLAlchemy 
+
+
+
+class ChampionVideoCreate(BaseModel):
+    video_id: int
+    customer_id: Optional[int] = None
+    rating: Optional[float] = 0.0
+    selected_language: Optional[str] = "EN"
+
+class ChampionVideoResponse(BaseModel):
+    id: int
+    customer_id: int
+    video_id: int
+    rating: float
+    selected_language: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+    
+                        

@@ -9,7 +9,6 @@ interface Category {
 }
 
 interface SidebarProps {
-  logoImg?: string;
   onClose?: () => void;
   searchTerm?: string;
   onSearchChange?: (val: string) => void;
@@ -22,8 +21,7 @@ interface SidebarProps {
   onLanguageChange?: (lang: string) => void;
 }
 
-export default function Sidebar({
-  logoImg = '',
+export default function Sidebar({ 
   onClose = () => {},
   searchTerm = '',
   onSearchChange = () => {},
@@ -62,29 +60,11 @@ export default function Sidebar({
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
-        padding: '20px 18px 18px',
+      
         borderBottom: '1px solid #f3f4f6',
         justifyContent: 'space-between',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {logoImg && (
-            <img
-              src={logoImg}
-              alt="Emotional Vaccines Logo"
-              style={{ width: 38, height: 38, objectFit: 'contain', flexShrink: 0, display: 'block' }}
-            />
-          )}
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#4a4a4a', lineHeight: 1.2, letterSpacing: '-0.01em' }}>
-              Emotional<br />
-              Vaccines<sup style={{ fontSize: 9, verticalAlign: 'super', fontWeight: 500, color: '#9ca3af' }}>®</sup>
-            </div>
-            <div style={{ fontSize: 10, fontWeight: 400, color: '#9ca3af', letterSpacing: '0.01em', marginTop: 3 }}>
-              Resiliency Education
-            </div>
-          </div>
-        </div>
+      
 
         {/* Close button — mobile only */}
         <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -95,21 +75,6 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-filters" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
-        {/* Search */}
-        <div className="sidebar-search" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#fff' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Filter by title..."
-            value={searchTerm}
-            onChange={e => onSearchChange(e.target.value)}
-            style={{ border: 'none', outline: 'none', fontSize: '14px', width: '100%', color: '#374151', backgroundColor: 'transparent' }}
-          />
-        </div>
-
-        
 
         {/* Categories Section */}
         <div>
@@ -135,6 +100,25 @@ export default function Sidebar({
             </div>
           )}
         </div>
+
+
+        {/* Search */}
+        <div className="sidebar-search" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#fff' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Filter by title..."
+            value={searchTerm}
+            onChange={e => onSearchChange(e.target.value)}
+            style={{ border: 'none', outline: 'none', fontSize: '14px', width: '100%', color: '#374151', backgroundColor: 'transparent' }}
+          />
+        </div>
+
+        
+
+        
 
          {/* Languages Section */}
         {languages.length > 0 && (

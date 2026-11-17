@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from werkzeug.security import generate_password_hash, check_password_hash
+from .auth import create_access_token
 from app.organizations_api import router as organizations_router
 from app.videos_api import router as videos_router
 from app.categories_api import router as categories_router
@@ -164,6 +165,9 @@ def login_user(credentials: LoginSchema, db: Session = Depends(get_db)):
             detail="Invalid username/email or password."
         )
 
+    # If valid, generate the token with an expiration timestamp
+    access_token = create_access_token(data={"sub": credentials.username})
+
     # 3. Check if user is deactivated
     if not user.is_active:
         raise HTTPException(
@@ -190,7 +194,9 @@ def login_user(credentials: LoginSchema, db: Session = Depends(get_db)):
             "email": user.email,
             "role": user_role,
             "status": user.status,
-            "is_active": user.is_active
+            "is_active": user.is_active,
+            "access_token": access_token, 
+            "token_type": "bearer"
         }
     }
 

@@ -10,7 +10,7 @@ class Config:
     # DB_PASSWORD = os.getenv('DB_PASSWORD', 'Pass#123')
     # DB_HOST = os.getenv('DB_HOST', 'localhost')
     # DB_PORT = os.getenv('DB_PORT', '5432')
-    #CLIENT_ORIGIN = os.getenv('CLIENT_ORIGIN', 'http://localhost:5173')
+    # CLIENT_ORIGIN = os.getenv('CLIENT_ORIGIN', 'http://localhost:5173')
 
     ALLOWED_ORIGINS = [
         "http://localhost:5173",

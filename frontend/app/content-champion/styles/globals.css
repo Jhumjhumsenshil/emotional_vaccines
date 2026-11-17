@@ -456,6 +456,7 @@ img {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .header-title-bar {
@@ -860,7 +861,7 @@ img {
 .footer-bar {
   position: fixed;
   bottom: 0;
-  left: var(--sidebar-w);
+  /*left: var(--sidebar-w);*/
   right: 0;
   background: var(--white);
   border-top: 1px solid var(--border);

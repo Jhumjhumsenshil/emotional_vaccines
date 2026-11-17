@@ -11,6 +11,9 @@ import {
   getCustomerMetaMap,
 } from '../../../services/organizationService';
 
+import api from "@/utils/api";
+import ProtectedRoute from "../../components/ProtectedRoute";
+
 // ─── NOTE ─────────────────────────────────────────────────────────────────────
 // Organization data is currently served from the frontend mock-data service
 // (localStorage + INITIAL_ORGANIZATIONS seed). No backend /api/organizations
@@ -579,13 +582,13 @@ const loadOrgs = useCallback(async () => {
   try {
     // 1. Fetch real organization data from your FastAPI backend
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
-    const response = await fetch(`${API_BASE_URL}/organizations`);
+    const response = await api.get(`${API_BASE_URL}/organizations`);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch organizations (Status: ${response.status})`);
-    }
+    // if (!response.ok) {
+    //   throw new Error(`Failed to fetch organizations (Status: ${response.status})`);
+    // }
 
-    const raw: Organization[] = await response.json();
+    const raw: Organization[] = response.data;
 
     // 2. Map customer metadata (if still using customer metadata service)
     const metaMap = getCustomerMetaMap();
@@ -749,17 +752,9 @@ const loadOrgs = useCallback(async () => {
     }
 
       // 2. Send POST request to FastAPI backend (NOTE: Do NOT set 'Content-Type' header)
-      const response = await fetch(`${API_BASE_URL}/organizations`, {
-        method: 'POST',
-        body: formData, 
-      });
+      const response = await api.post(`${API_BASE_URL}/organizations`, formData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to add organization');
-      }
-
-      const createdOrg = await response.json();
+      const createdOrg = response.data;
 
       // 3. Success feedback & UI reset
       showToast(`Organization "${createdOrg.name}" was added successfully.`);
@@ -794,17 +789,9 @@ const loadOrgs = useCallback(async () => {
       formData.append('logo', form.logo_file);
     }
 
-    const response = await fetch(`${API_BASE_URL}/organizations/${editOrg.id}`, {
-      method: 'PUT',
-      body: formData, // Do NOT set manual Content-Type headers
-    });
+    const response = await api.put(`${API_BASE_URL}/organizations/${editOrg.id}`, formData);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to update organization');
-    }
-
-    const updatedOrg = await response.json();
+    const updatedOrg = response.data;
     showToast(`Organization "${updatedOrg.name}" was updated successfully.`);
     setEditOrg(null);
     loadOrgs();
@@ -865,6 +852,7 @@ const loadOrgs = useCallback(async () => {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
+    <ProtectedRoute>
     <AppLayout title="Organization Management">
       <div className="admin-container" style={{ margin: 0, maxWidth: '100%', padding: 0 }}>
 
@@ -1274,5 +1262,6 @@ const loadOrgs = useCallback(async () => {
         </div>
       )}
     </AppLayout>
+    </ProtectedRoute>
   );
 }

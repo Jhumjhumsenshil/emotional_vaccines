@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FALLBACK_RECIPIENT_VIDEOS, FALLBACK_RECIPIENT_IDS } from '../data/recipientVideos';
+//import { FALLBACK_RECIPIENT_VIDEOS, FALLBACK_RECIPIENT_IDS } from '../data/recipientVideos';
 
 interface RecipientItem {
   id: string;
@@ -30,25 +30,26 @@ interface MyRecipientsProps {
   queue?: VideoItem[];
   removedIds?: string[];
   onRemoveVideo?: (id: string) => void;
+  onRefreshVideos?: () => Promise<void> | void;
 }
 
 // ── Fallback recipients list ──────────────────────────────────────────────
-const FALLBACK_RECIPIENTS: RecipientItem[] = [
-  {
-    id: "rec-1", name: "Sarah Jenkins", email: "sarah.j@apexmedia.io",
-    company: "Apex Community Wellness", role: "Director of Outreach",
-    status: "Active", channelFocus: "Families Thrive",
-    assignedVideos: ["vid-001", "vid-003", "vid-007"],
-    avatar: "https://i.pravatar.cc/120?img=47"
-  },
-  {
-    id: "rec-2", name: "Marcus Vance", email: "m.vance@lumina-agency.com",
-    company: "Lumina Health Partners", role: "Community Programs Lead",
-    status: "Active", channelFocus: "Self Care",
-    assignedVideos: ["vid-002", "vid-004"],
-    avatar: "https://i.pravatar.cc/120?img=12"
-  },
-];
+// const FALLBACK_RECIPIENTS: RecipientItem[] = [
+//   {
+//     id: "rec-1", name: "Sarah Jenkins", email: "sarah.j@apexmedia.io",
+//     company: "Apex Community Wellness", role: "Director of Outreach",
+//     status: "Active", channelFocus: "Families Thrive",
+//     assignedVideos: ["vid-001", "vid-003", "vid-007"],
+//     avatar: "https://i.pravatar.cc/120?img=47"
+//   },
+//   {
+//     id: "rec-2", name: "Marcus Vance", email: "m.vance@lumina-agency.com",
+//     company: "Lumina Health Partners", role: "Community Programs Lead",
+//     status: "Active", channelFocus: "Self Care",
+//     assignedVideos: ["vid-002", "vid-004"],
+//     avatar: "https://i.pravatar.cc/120?img=12"
+//   },
+// ];
 
 // ── Star Rating ───────────────────────────────────────────────────────────
 function StarRating({ value, onChange }: { value: number; onChange?: (val: number) => void }) {
@@ -127,32 +128,61 @@ function AddModal({ onClose, onAdd }: { onClose: () => void; onAdd: (form: any) 
 
 // ── Main Page ─────────────────────────────────────────────────────────────
 export default function MyRecipients({ queue = [], removedIds = [], onRemoveVideo }: MyRecipientsProps) {
-  const [recipients, setRecipients] = useState<RecipientItem[]>(FALLBACK_RECIPIENTS);
+  //const [recipients, setRecipients] = useState<RecipientItem[]>(FALLBACK_RECIPIENTS);
+  const [apiVideos, setApiVideos] = useState<VideoItem[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [sortAlpha, setSortAlpha] = useState(false);
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [langToggles, setLangToggles] = useState<Record<string, boolean>>({});
 
-  // Build the merged video list:
-  const newQueueVideos = (queue || []).filter(v => !FALLBACK_RECIPIENT_IDS.has(v.id));
-  const baseVideos = [...FALLBACK_RECIPIENT_VIDEOS, ...newQueueVideos];
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+
+  // Fetch videos (including default ones) from FastAPI backend
+  // useEffect(() => {
+  //   fetch(`${API_BASE_URL}/videos/default_video`)
+  //     .then(r => r.ok ? r.json() : Promise.reject())
+  //     .then(data => {
+  //       if (Array.isArray(data)) {
+  //         const formatted = data.map((v: any) => ({
+  //           id: String(v.id),
+  //           title: v.default_title,
+  //           description: v.default_description,
+  //           thumbnail: v.default_thumbnail_url,
+  //           isDefault: v.is_default,
+  //           category: v.categories?.[0]?.name || 'General',
+  //           languages: v.streams?.map((s: any) => s.language) || ['English']
+  //         }));
+  //         setApiVideos(formatted);
+  //       }
+  //     })
+  //     .catch(err => console.error('Failed to load backend videos', err));
+  // }, [API_BASE_URL]);
+
+  // Build the merged video list (Fallback + API fetched default/queued videos + queue props)
+  //const defaultApiVideos = apiVideos.filter(v => v.isDefault || FALLBACK_RECIPIENT_IDS.has(v.id));
+
+  const defaultApiVideos = apiVideos.filter(v => v.isDefault);
+  //const newQueueVideos = (queue || []).filter(v => !FALLBACK_RECIPIENT_IDS.has(v.id) && !apiVideos.some(av => av.id === v.id));
+
+  const newQueueVideos = (queue || []).filter(v => !apiVideos.some(av => av.id === v.id));
+  
+  //const baseVideos = [...FALLBACK_RECIPIENT_VIDEOS, ...defaultApiVideos, ...newQueueVideos];
+  const baseVideos = [...defaultApiVideos, ...newQueueVideos];
   const videos = baseVideos.filter(v => !removedIds.includes(v.id));
 
-  useEffect(() => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-    fetch(`${API_BASE_URL}/api/recipients`)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(j => { if (j.data?.length) setRecipients(j.data); })
-      .catch(() => {});
-  }, []);
+  // useEffect(() => {
+  //   fetch(`${API_BASE_URL}/recipients`)
+  //     .then(r => r.ok ? r.json() : Promise.reject())
+  //     .then(j => { if (j.data?.length) setRecipients(j.data); })
+  //     .catch(() => {});
+  // }, [API_BASE_URL]);
 
-  const handleAdd = (form: any) => {
-    const created = { ...form, id: `rec-${Date.now()}`, assignedVideos: [], avatar: `https://i.pravatar.cc/120?u=${encodeURIComponent(form.email)}` };
-    setRecipients(r => [created, ...r]);
-    setShowAddModal(false);
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-    fetch(`${API_BASE_URL}/api/recipients`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(created) }).catch(() => {});
-  };
+  // const handleAdd = (form: any) => {
+  //   const created = { ...form, id: `rec-${Date.now()}`, assignedVideos: [], avatar: `https://i.pravatar.cc/120?u=${encodeURIComponent(form.email)}` };
+  //   setRecipients(r => [created, ...r]);
+  //   setShowAddModal(false);
+  //   fetch(`${API_BASE_URL}/recipients`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(created) }).catch(() => {});
+  // };
 
   const handleRemove = (id: string) => {
     if (onRemoveVideo) onRemoveVideo(id);
@@ -258,13 +288,13 @@ export default function MyRecipients({ queue = [], removedIds = [], onRemoveVide
 
                 {/* EN */}
                 <td style={{ textAlign: 'center', padding: '10px 4px' }}>
-                  <input type="checkbox" checked={getLangToggle(vid.id, 'EN')} onChange={() => toggleLang(vid.id, 'EN')}
+                  <input type="checkbox" checked={getLangToggle(vid.id, 'English') || getLangToggle(vid.id, 'EN')} onChange={() => toggleLang(vid.id, 'EN')}
                     style={{ accentColor: '#f97316', width: 15, height: 15, cursor: 'pointer' }} />
                 </td>
 
                 {/* SP */}
                 <td style={{ textAlign: 'center', padding: '10px 4px' }}>
-                  <input type="checkbox" checked={getLangToggle(vid.id, 'SP')} onChange={() => toggleLang(vid.id, 'SP')}
+                  <input type="checkbox" checked={getLangToggle(vid.id, 'Spanish') || getLangToggle(vid.id, 'SP')} onChange={() => toggleLang(vid.id, 'SP')}
                     style={{ accentColor: '#f97316', width: 15, height: 15, cursor: 'pointer' }} />
                 </td>
 
@@ -308,7 +338,9 @@ export default function MyRecipients({ queue = [], removedIds = [], onRemoveVide
         )}
       </div>
 
-      {showAddModal && <AddModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />}
+      {/* {showAddModal && <AddModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />} */}
+
+     
     </div>
   );
 }

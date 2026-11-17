@@ -5,6 +5,8 @@ from pathlib import Path
 import shutil
 import uuid
 
+from app.auth import verify_access_token
+
 # Import your database session, models, and schemas here
 # from database import get_db
 # import models, schemas
@@ -19,13 +21,13 @@ UPLOAD_DIR = Path("uploads/logos")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True) # Creates folder if it doesn't exist
 
 # 1. Get All Organizations
-@router.get("", response_model=List[schemas.OrganizationResponse])
+@router.get("", response_model=List[schemas.OrganizationResponse], dependencies=[Depends(verify_access_token)])
 def get_organizations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     orgs = db.query(models.OrganizationModel).offset(skip).limit(limit).all()
     return orgs
 
 # 2. Create an Organization
-@router.post("", response_model=schemas.OrganizationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.OrganizationResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_access_token)])
 def create_organization(
     name: str = Form(...),
     slug: str = Form(...),
@@ -74,7 +76,7 @@ def create_organization(
     return db_org
 
 # 3. Update an Organization
-@router.put("/{org_id}", response_model=schemas.OrganizationResponse)
+@router.put("/{org_id}", response_model=schemas.OrganizationResponse, dependencies=[Depends(verify_access_token)])
 def update_organization(
     org_id: int,
     name: str = Form(None),

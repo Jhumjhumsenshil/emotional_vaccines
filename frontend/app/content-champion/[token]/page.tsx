@@ -17,9 +17,38 @@ async function getChampionData(token: string) {
   }
 }
 
+async function getDefaultVideos() {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+  try {
+    const res = await fetch(`${API_BASE_URL}/videos/default_video`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      return data
+        .filter((v: any) => v.is_default)
+        .map((v: any) => ({
+          id: String(v.id),
+          title: v.default_title,
+          description: v.default_description,
+          thumbnail: v.default_thumbnail_url,
+          isDefault: v.is_default,
+          category: v.categories?.[0]?.name || 'General',
+          languages: v.streams?.map((s: any) => s.language) || ['EN']
+        }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch default videos:', error);
+    return [];
+  }
+}
+
 export default async function Page({ params }: PageProps) {
   const { token } = await params;
-  const champion = await getChampionData(token);
+  const [champion, defaultVideos] = await Promise.all([
+    getChampionData(token),
+    getDefaultVideos()
+  ]);
 
   if (!champion) {
     return (
@@ -29,5 +58,5 @@ export default async function Page({ params }: PageProps) {
     );
   }
 
-  return <ContentChampionDashboard champion={champion} />;
+  return <ContentChampionDashboard champion={champion} initialDefaultVideos={defaultVideos}/>;
 }

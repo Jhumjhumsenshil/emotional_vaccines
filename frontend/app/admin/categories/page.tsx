@@ -5,6 +5,9 @@ import AppLayout from '../../components/layout/AppLayout';
 import { Button, Input, Badge } from '../../components/ui/FormComponents';
 import Modal from '../../components/ui/Modal';
 
+import api from "@/utils/api";
+import ProtectedRoute from "../../components/ProtectedRoute";
+
 // Update interface to support numeric ID from FastAPI / PostgreSQL
 export interface Category {
   id: number | string;
@@ -33,9 +36,8 @@ export default function CategoriesPage() {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await fetch(`${API_BASE_URL}/categories`);
-      if (!res.ok) throw new Error('Failed to fetch categories');
-      const data = await res.json();
+      const res = await api.get(`${API_BASE_URL}/categories`);      
+      const data = res.data;
       setCategories(data);
     } catch (err: any) {
       setError(err.message || 'Error connecting to server');
@@ -82,28 +84,13 @@ export default function CategoriesPage() {
     try {
       if (editingCategory) {
         // PUT / PATCH request to update category
-        const res = await fetch(`${API_BASE_URL}/categories/${editingCategory.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
+        const res = await api.put(`${API_BASE_URL}/categories/${editingCategory.id}`, formData);
 
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.detail || 'Failed to update category');
-        }
       } else {
         // POST request to add new category
-        const res = await fetch(`${API_BASE_URL}/categories`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.detail || 'Failed to create category');
-        }
+        const res = await api.post(`${API_BASE_URL}/categories`, formData);              
+          
+          
       }
 
       // Re-fetch category list and close modal
@@ -157,6 +144,7 @@ export default function CategoriesPage() {
   );
 
   return (
+    <ProtectedRoute>
     <AppLayout title="Categories">
       <div className="flex justify-between items-center mb-6 gap-4">
         <div className="w-full max-w-md">
@@ -263,5 +251,6 @@ export default function CategoriesPage() {
         </div>
       </Modal>
     </AppLayout>
+    </ProtectedRoute>
   );
 }

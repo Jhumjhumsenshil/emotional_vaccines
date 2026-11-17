@@ -5,6 +5,7 @@ import Link from 'next/link';
 import AppLayout from '../../components/layout/AppLayout';
 import Modal from '../../components/ui/Modal';
 import { Input, Select, Button } from '../../components/ui/FormComponents';
+import api from "@/utils/api";
 import {
   Organization,
   CustomerType,
@@ -12,6 +13,8 @@ import {
   getCustomerMetaMap,
   saveCustomerMeta,
 } from '../../../services/organizationService';
+
+import ProtectedRoute from "../../components/ProtectedRoute";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -71,6 +74,14 @@ interface FormErrors {
   //password?: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  description: string;
+  videoCount: number;
+}
+
+   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const ITEMS_PER_PAGE = 10;
@@ -366,6 +377,24 @@ function CustomerFormPanel({
 }) {
   const isOrgCustomer = form.customerType === 'Organization-Based Customer';
 
+   const [categories, setCategories] = useState<Category[]>([]);
+
+
+   const loadCategories = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories`);
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories', error);
+    }
+  };
+
+   useEffect(() => {     
+      loadCategories();
+    }, []);
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
@@ -448,47 +477,54 @@ function CustomerFormPanel({
 
         
 
-        {/* Video Access Categories */}
-        <div style={{ gridColumn: '1 / -1', marginBottom: '1rem' }}>
-          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-            Video Access *
+       <div style={{ gridColumn: '1 / -1', marginBottom: '1rem' }}>
+  <label
+    style={{
+      display: 'block',
+      fontSize: '0.8rem',
+      fontWeight: 600,
+      color: 'var(--text-main)',
+      marginBottom: '0.5rem',
+    }}
+  >
+    Video Access *
+  </label>
+
+  <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      {categories.map((cat: any) => {
+        // Uses slug if provided by /categories API, otherwise converts name (e.g., "Self Care" -> "self_care")
+        const categoryValue = cat.id || cat.name.toLowerCase().replace(/\s+/g, '_');
+
+        return (
+          <label
+            key={cat.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.85rem',
+              color: 'var(--text-main)',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={form.video_access.includes(categoryValue)}
+              onChange={() => onVideoAccessChange(categoryValue)}
+              style={{
+                width: 16,
+                height: 16,
+                accentColor: 'var(--primary-color, #6366f1)',
+                cursor: 'pointer',
+              }}
+            />
+            {cat.name}
           </label>
-          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={form.video_access.includes("self_care")}
-                onChange={() => onVideoAccessChange("self_care")}
-                 style={{ width: 16, height: 16, accentColor: 'var(--primary-color, #6366f1)', cursor: 'pointer' }}
-              />
-              Self Care
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={form.video_access.includes("families_thrive")}
-                onChange={() => onVideoAccessChange("families_thrive")}
-                 style={{ width: 16, height: 16, accentColor: 'var(--primary-color, #6366f1)', cursor: 'pointer' }}
-              />
-              Families Thrive
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={form.video_access.includes("youth_to_youth")}
-                onChange={() => onVideoAccessChange("youth_to_youth")}
-                 style={{ width: 16, height: 16, accentColor: 'var(--primary-color, #6366f1)', cursor: 'pointer' }}
-              />
-              Youth to Youth
-            </label>
-
-          </div>
-
-          
-        </div>
+        );
+      })}
+    </div>
+  </div>
         {/* Notes Textarea */}
         <div style={{ gridColumn: '1 / -1', marginBottom: '1rem' }}>
           <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
@@ -549,6 +585,8 @@ export default function CustomersPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
 
+ 
+
   // Search / Filter / Sort / Pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [customerFilter, setCustomerFilter] = useState<CustomerFilter>('all');
@@ -578,6 +616,8 @@ export default function CustomersPage() {
   const [saving, setSaving] = useState(false);
 
 
+
+
     const handleCheckboxChange = (value: string) => {
     setForm((prev) => {
       const currentList = prev.video_access || [];
@@ -600,7 +640,7 @@ export default function CustomersPage() {
       useEffect(() => {
         async function fetchOrgs() {
           try {
-            const res = await fetch('http://localhost:8000/api/organizations');
+            const res = await fetch(`${API_BASE_URL}/organizations`);
             if (res.ok) {
               const data = await res.json();
               setOrganizations(data);
@@ -612,6 +652,10 @@ export default function CustomersPage() {
         fetchOrgs();
       }, []);
 
+
+
+
+
   // ── Data Fetching ──
 
   const fetchData = useCallback(async () => {
@@ -619,9 +663,9 @@ export default function CustomersPage() {
     setLoading(true);
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
     
-    const res = await fetch(`${API_BASE_URL}/customers`);
-    if (res.ok) {
-      const data = await res.json();
+    const res = await api.get(`${API_BASE_URL}/customers`);
+   // if (res.ok) {
+      const data = res.data;
       
       // Map backend response fields to match your frontend CustomerItem interface
       const formattedCustomers: CustomerItem[] = data.map((c: any) => ({
@@ -643,9 +687,9 @@ export default function CustomersPage() {
       }));
 
       setCustomers(formattedCustomers);
-    } else {
-      showToast('Failed to load customer records', 'error');
-    }
+    // } else {
+    //   showToast('Failed to load customer records', 'error');
+    // }
   } catch (err) {
     console.error(err);
     showToast('Network error while connecting to server', 'error');
@@ -948,6 +992,7 @@ useEffect(() => {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
+    <ProtectedRoute>
     <AppLayout title="Customer Management">
       <div className="admin-container" style={{ margin: 0, maxWidth: '100%', padding: 0 }}>
 
@@ -1461,5 +1506,6 @@ useEffect(() => {
         </div>
       )}
     </AppLayout>
+    </ProtectedRoute>
   );
 }

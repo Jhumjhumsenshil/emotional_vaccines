@@ -2,33 +2,76 @@
 
 import { useState, useEffect, useRef } from 'react';
 import AppLayout from '../../components/layout/AppLayout';
-import { Video, Category, getMockVideos, saveMockVideos, getMockCategories } from '../../../services/mockData';
 import { Button, Input, Select, Badge } from '../../components/ui/FormComponents';
 import Modal from '../../components/ui/Modal';
+import ProtectedRoute from "../../components/ProtectedRoute";
+import api from "@/utils/api";
 
 const AVAILABLE_LANGUAGES = [
   'English',  
   'Spanish',  
 ];
 
+export interface VideoStream {
+  id: number;
+  language: string;
+  stream_url: string;
+  thumbnail_url?: string;
+  title?: string;
+}
+
+export interface Video {
+  id: string;
+  title: string;
+  description: string;
+  category_id?: string; // Keep optional for backwards compatibility if needed
+  category_ids: string[]; // <-- Add this for multiple categories
+  videoUrl: string;
+  videoUrls?: string[];
+  thumbnail: string;
+  language: string;
+  languages?: string[];
+  duration: number;
+  isPublished: boolean;
+  isDefault?: boolean;
+  isFeatured: boolean;
+  tags: string;
+  displayOrder: number;
+  views: number;
+  createdAt: string;
+  streams: VideoStream[];
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  description: string;
+  videoCount: number;
+}
+
 export default function VideosPage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
-  const [filterStatus, setFilterStatus] = useState(''); // 'all', 'published', 'unpublished'
+  const [filterStatus, setFilterStatus] = useState('');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const [formData, setFormData] = useState<Partial<Video>>({});
-  const [videoUrls, setVideoUrls] = useState<string[]>(['']);
+  
+  // Fixed state structure: managing streams with language and URL together
+  const [videoStreams, setVideoStreams] = useState<Array<{ language: string; stream_url: string }>>([
+    { language: 'English', stream_url: '' }
+  ]);
+  
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['English']);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [langSearch, setLangSearch] = useState('');
   const langDropdownRef = useRef<HTMLDivElement>(null);
- 
 
-  // ── Load Categories from API ──
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+
   const loadCategories = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/categories`);
@@ -41,36 +84,32 @@ export default function VideosPage() {
     }
   };
 
-
-    const loadVideos = async () => {
+  const loadVideos = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/videos`);
-      if (res.ok) {
-        const data = await res.json();
-        
+      const res = await api.get(`${API_BASE_URL}/videos/list`);
+     // if (res.ok) {
+        const data = res.data;
         const formattedVideos = data.map((v: any) => ({
           id: v.id,
-          category_id: v.category_id, // Can be number or null
+          category_ids: v.categories ? v.categories.map((c: any) => String(c.id)) : (v.category_ids ? v.category_ids.map(String) : []),
           title: v.default_title,
           description: v.default_description,
           thumbnail: v.default_thumbnail_url,
           isPublished: v.is_published,
+          isDefault: Boolean(v.is_default),
           duration: v.duration_seconds,
-          views: v.views || 0, // Fallback if views aren't tracked yet
+          views: v.views || 0,
           tags: v.tags || [],
           streams: v.streams || []
         }));
-        
         setVideos(formattedVideos);
-      }
+      //}
     } catch (error) {
       console.error('Failed to load videos', error);
     }
   };
 
   useEffect(() => {
-    //setVideos(getMockVideos());
-    //setCategories(getMockCategories());
     loadVideos();
     loadCategories();
   }, []);
@@ -95,112 +134,76 @@ export default function VideosPage() {
     }
   };
 
-  const handleAddUrl = () => {
-    setVideoUrls([...videoUrls, '']);
+  const handleAddStream = () => {
+    setVideoStreams([...videoStreams, { language: 'English', stream_url: '' }]);
   };
 
-  const handleRemoveUrl = (index: number) => {
-    if (videoUrls.length > 1) {
-      setVideoUrls(videoUrls.filter((_, i) => i !== index));
+  const handleRemoveStream = (index: number) => {
+    if (videoStreams.length > 1) {
+      setVideoStreams(videoStreams.filter((_, i) => i !== index));
     }
   };
 
-  // const handleUrlChange = (index: number, value: string) => {
-  //   const updated = [...videoUrls];
-  //   updated[index] = value;
-  //   setVideoUrls(updated);
-  // };
+  const handleStreamUrlChange = (index: number, value: string) => {
+    const updated = [...videoStreams];
+    updated[index].stream_url = value;
+    setVideoStreams(updated);
+  };
+
+  const handleStreamLanguageChange = (index: number, value: string) => {
+    const updated = [...videoStreams];
+    updated[index].language = value;
+    setVideoStreams(updated);
+  };
 
   const filteredLanguages = AVAILABLE_LANGUAGES.filter(lang =>
     lang.toLowerCase().includes(langSearch.toLowerCase())
   );
 
-  // const handleSave = () => {
-  //   const cleanUrls = videoUrls.map(u => u.trim()).filter(Boolean);
-  //   if (!formData.title || !formData.categoryId || cleanUrls.length === 0) return;
-    
-  //   const primaryUrl = cleanUrls[0];
-  //   const langs = selectedLanguages.length > 0 ? selectedLanguages : ['English'];
-  //   const languageString = langs.join(', ');
-
-  //   const payload: Partial<Video> = {
-  //     ...formData,
-  //     videoUrl: primaryUrl,
-  //     videoUrls: cleanUrls,
-  //     language: languageString,
-  //     languages: langs,
-  //   };
-    
-  //   let updated;
-  //   if (editingVideo) {
-  //     updated = videos.map(v => v.id === editingVideo.id ? { ...v, ...payload } as Video : v);
-  //   } else {
-  //     updated = [...videos, { 
-  //       ...payload,
-  //       id: `v_${Date.now()}`,
-  //       views: 0,
-  //       createdAt: new Date().toISOString(),
-  //       tags: typeof formData.tags === 'string' ? (formData.tags as string).split(',').map(t => t.trim()) : formData.tags || [],
-  //     } as Video];
-  //   }
-    
-  //   // Sort by display order
-  //   updated.sort((a, b) => a.displayOrder - b.displayOrder);
-    
-  //   setVideos(updated);
-  //   saveMockVideos(updated);
-  //   closeModal();
-  // };
-
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
   const handleSave = async () => {
-    const cleanUrls = videoUrls.map(u => u.trim()).filter(Boolean);
-    if (!formData.title || !formData.category_id || cleanUrls.length === 0) return;
-    
-    const langs = selectedLanguages.length > 0 ? selectedLanguages : ['English'];
+    const cleanStreams = videoStreams
+      .map(s => ({ language: s.language, stream_url: s.stream_url.trim() }))
+      .filter(s => s.stream_url !== '');
 
-    // Convert comma-separated string (e.g. "health, mental, care") into an array of clean strings
+    if (!formData.title || !formData.category_ids || cleanStreams.length === 0) return;
+
     const tagList = typeof formData.tags === 'string'
       ? (formData.tags as string).split(',').map(t => t.trim()).filter(Boolean)
       : Array.isArray(formData.tags) ? formData.tags : [];
 
-    // Map your form state into the normalized database schema structure
-    const streamsPayload = cleanUrls.map((url, idx) => ({
-      language: langs[idx] || langs[0], // fallback mapping to selected languages
-      stream_url: url,
+    const streamsPayload = cleanStreams.map(s => ({
+      language: s.language,
+      stream_url: s.stream_url,
       title: formData.title,
       thumbnail_url: formData.thumbnail || null
     }));
 
+    const categoryIdsList = Array.isArray(formData.category_ids) 
+  ? formData.category_ids.map(id => parseInt(id as string)).filter(Boolean) 
+  : [];
+
     const payload = {
-      category_id: parseInt(formData.category_id) || null,
+      category_ids: categoryIdsList,
       default_title: formData.title,
       default_description: formData.description || null,
       duration_seconds: formData.duration || 0,
       default_thumbnail_url: formData.thumbnail || null,
       is_published: !!formData.isPublished,
+      is_default: !!formData.isDefault,
       streams: streamsPayload,
       tags: tagList
     };
 
     try {
       if (editingVideo) {
-        const res = await fetch(`${API_BASE_URL}/videos/${editingVideo.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error('Failed to update video');
+        const res = await api.put(`${API_BASE_URL}/videos/${editingVideo.id}`, payload);
+        //if (!res.ok) throw new Error('Failed to update video');
       } else {
-        const res = await fetch(`${API_BASE_URL}/videos`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error('Failed to create video');
+        const res = await api.post(`${API_BASE_URL}/videos`, payload);
+       // if (!res.ok) throw new Error('Failed to create video');
       }
 
-      //loadVideos();
+      loadVideos();
       closeModal();
     } catch (error) {
       console.error('Error saving video:', error);
@@ -211,43 +214,112 @@ export default function VideosPage() {
     if (confirm('Are you sure you want to delete this video?')) {
       const updated = videos.filter(v => v.id !== id);
       setVideos(updated);
-      saveMockVideos(updated);
     }
   };
 
-  const togglePublish = (id: string) => {
-    const updated = videos.map(v => v.id === id ? { ...v, isPublished: !v.isPublished } : v);
+  // const togglePublish = (id: string) => {
+  //   const updated = videos.map(v => v.id === id ? { ...v, isPublished: !v.isPublished } : v);
+  //   setVideos(updated);
+  // };
+
+
+  const togglePublish = async (id: string) => {
+  const targetVideo = videos.find((v) => String(v.id) === String(id));
+  if (!targetVideo) return;
+
+  const newPublishStatus = !targetVideo.isPublished;
+
+  // 1. Optimistically update the UI immediately
+  setVideos((prev) =>
+    prev.map((v) =>
+      String(v.id) === String(id) ? { ...v, isPublished: newPublishStatus } : v
+    )
+  );
+
+  // 2. Persist the change in PostgreSQL
+  try {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+
+    const response = await fetch(`${API_BASE_URL}/videos/${id}/publish`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        is_published: newPublishStatus,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update publish status');
+    }
+  } catch (error) {
+    console.error('Error updating publish status:', error);
+    // 3. Roll back UI state if the backend update fails
+    setVideos((prev) =>
+      prev.map((v) =>
+        String(v.id) === String(id) ? { ...v, isPublished: targetVideo.isPublished } : v
+      )
+    );
+  }
+};
+
+  const toggleDefault = (id: string) => {
+    const updated = videos.map(v => v.id === id ? { ...v, isDefault: !v.isDefault } : v);
     setVideos(updated);
-    saveMockVideos(updated);
   };
 
-
-//   setFormData({ 
-//   ...video, 
-//   tags: video.tags ? video.tags.map((t: any) => t.name).join(', ') : '' 
-// });
-
   const openModal = (video?: Video) => {
+    console.log("Opening modal with video data:", video);
     if (video) {
-      setEditingVideo(video);
-      setFormData({ ...video, tags: video.tags.join(', ') as any });
-      const urls = video.videoUrls && video.videoUrls.length > 0 
-        ? video.videoUrls 
-        : (video.videoUrl ? [video.videoUrl] : ['']);
-      setVideoUrls(urls);
+      setEditingVideo(video);    
       
-      const langs = video.languages && video.languages.length > 0
-        ? video.languages
-        : (video.language ? video.language.split(',').map(s => s.trim()).filter(Boolean) : ['English']);
-      setSelectedLanguages(langs.length > 0 ? langs : ['English']);
+      const rawCategories = (video as any).categories;
+      const rawCategoryIds = video.category_ids || (video as any).category_ids;
+      
+      let loadedCategoryIds: string[] = [];
+      if (Array.isArray(rawCategories) && rawCategories.length > 0) {
+        loadedCategoryIds = rawCategories.map((c: any) => String(c.id || c));
+      } else if (Array.isArray(rawCategoryIds) && rawCategoryIds.length > 0) {
+        loadedCategoryIds = rawCategoryIds.map((id: any) => String(id));
+      } else if (video.category_id || (video as any).category_id) {
+        loadedCategoryIds = [String(video.category_id || (video as any).category_id)];
+      }
+
+
+      setFormData({
+        title: video.title || '',
+        description: video.description || '',
+        category_ids: loadedCategoryIds,
+        thumbnail: video.thumbnail || '',
+        duration: video.duration || 0,
+        displayOrder: video.displayOrder || 0,
+        isPublished: video.isPublished || false,
+        isFeatured: video.isFeatured || false,
+        isDefault: video.isDefault ?? (video as any).is_default ?? false,
+        tags: Array.isArray(video.tags) 
+          ? video.tags.map((t: any) => typeof t === 'string' ? t : t.name).join(', ') 
+          : (typeof video.tags === 'string' ? video.tags : '')
+      });
+
+      const loadedStreams = video.streams && video.streams.length > 0 
+        ? video.streams.map(s => ({ language: s.language || 'English', stream_url: s.stream_url || '' }))
+        : [{ language: 'English', stream_url: '' }];
+      
+      setVideoStreams(loadedStreams);
+
+      const langs = video.streams ? video.streams.map(s => s.language) : [];
+      setSelectedLanguages(langs.length > 0 ? Array.from(new Set(langs)) : ['English']);
+
     } else {
       setEditingVideo(null);
       setFormData({ 
         title: '', description: '', category_id: '', thumbnail: '',
-        duration: 0, isPublished: false, isFeatured: false,
-        tags: [] as any, displayOrder: videos.length + 1
+        duration: 0, isPublished: false, isFeatured: false, isDefault: false,
+        tags: '' as any, displayOrder: videos.length + 1,
+        category_ids: []
       });
-      setVideoUrls(['']);
+      setVideoStreams([{ language: 'English', stream_url: '' }]);
       setSelectedLanguages(['English']);
     }
     setIsLangDropdownOpen(false);
@@ -262,58 +334,58 @@ export default function VideosPage() {
     setLangSearch('');
   };
 
-  const filtered = videos.filter(v => {
-    const matchSearch = v.title.toLowerCase().includes(search.toLowerCase()) || 
-                        v.description.toLowerCase().includes(search.toLowerCase());
-    const matchCat = filterCategory ? v.category_id === filterCategory : true;
-    const matchStatus = filterStatus === 'published' ? v.isPublished : 
-                        filterStatus === 'unpublished' ? !v.isPublished : true;
-    return matchSearch && matchCat && matchStatus;
-  });
+const filtered = videos.filter(v => {
+  // Fallbacks to handle both frontend and backend property names
+  const title = v.title ;
+  const description = v.description ;
+  const isPublished = v.isPublished !== undefined ? v.isPublished : v.isPublished;
 
+  const matchSearch = title.toLowerCase().includes(search.toLowerCase()) || 
+                      description.toLowerCase().includes(search.toLowerCase());
+  
+  // Check against both single category_id and category_ids array
+  const targetCat = String(filterCategory);
+  const matchCat = filterCategory ? (
+    String(v.category_id) === targetCat || 
+    (Array.isArray(v.category_ids) && v.category_ids.some(id => String(id) === targetCat))
+  ) : true;
 
-  // Helper to extract video ID and auto-generate thumbnail URL from YouTube links
+  const matchStatus = filterStatus === 'published' ? isPublished : 
+                      filterStatus === 'unpublished' ? !isPublished : true;
+
+  return matchSearch && matchCat && matchStatus;
+});
+
   const extractThumbnailFromUrl = async (url: string): Promise<string> => {
-    if (!url) return '';
+  if (!url) return '';
 
-    // 1. Handle YouTube URLs
-    let videoId = '';
-    if (url.includes('youtube.com/watch?v=')) {
-      videoId = url.split('v=')[1]?.substring(0, 11);
-    } else if (url.includes('youtu.be/')) {
-      videoId = url.split('be/')[1]?.substring(0, 11);
-    }
+  // 1. Robust YouTube ID extraction (handles watch, youtu.be, shorts, embeds)
+  const ytRegExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const ytMatch = url.match(ytRegExp);
+  const videoId = (ytMatch && ytMatch[2].length === 11) ? ytMatch[2] : null;
 
-    if (videoId && videoId.length === 11) {
-      return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-    }
+  if (videoId) {
+    return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  }
 
-    // 2. Handle Vimeo URLs via Vimeo oEmbed API
-    if (url.includes('vimeo.com/')) {
-      try {
-        const response = await fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`);
-        if (response.ok) {
-          const data = await response.json();
-          // Returns the highest quality thumbnail URL available from Vimeo
-          return data.thumbnail_url || '';
-        }
-      } catch (error) {
-        console.error('Failed to fetch Vimeo thumbnail:', error);
+  // 2. Vimeo Thumbnail Extraction via oEmbed with HD Upgrade
+  if (url.includes('vimeo.com/')) {
+    try {
+      const response = await fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`);
+      if (response.ok) {
+        const data = await response.json();
+        const baseThumb = data.thumbnail_url || '';
+        // Automatically upgrade Vimeo thumbnail resolution to HD (1280x720) if possible
+        return baseThumb ? baseThumb.replace(/_\d+x\d+/, '_1280x720') : '';
       }
+    } catch (error) {
+      console.error('Failed to fetch Vimeo thumbnail:', error);
     }
+  }
 
-    return '';
-  };
+  return '';
+};
 
-
-  // 1. Synchronous handler for instant typing
-  const handleUrlChange = (index: number, url: string) => {
-    const updated = [...videoUrls];
-    updated[index] = url;
-    setVideoUrls(updated);
-  };
-
-  // 2. Async handler for fetching the thumbnail (trigger this onBlur or after update)
   const handleUrlBlur = async (url: string) => {
     const autoThumb = await extractThumbnailFromUrl(url);
     if (autoThumb) {
@@ -321,7 +393,56 @@ export default function VideosPage() {
     }
   };
 
+ const getCategoryDisplay = (video: any, globalCategories: any[]) => {
+  // Case A: Video has an array of category IDs (e.g. [2, 3])
+  if (Array.isArray(video.category_ids) && video.category_ids.length > 0) {
+    const matchedNames = video.category_ids
+      .map((catId: number) => {
+        const found = globalCategories.find((c) => Number(c.id) === Number(catId));
+        return found?.name;
+      })
+      .filter(Boolean); // removes undefined if an ID doesn't match
+
+    if (matchedNames.length > 0) {
+      return matchedNames.join(', ');
+    }
+  }
+
+  // Case B: Fallback if it uses a single category_id field
+  if (video.category_id != null) {
+    const matchedCat = globalCategories.find(
+      (c) => Number(c.id) === Number(video.category_id)
+    );
+    if (matchedCat?.name) return matchedCat.name;
+  }
+
+  // Case C: Fallback if categories are already embedded objects
+  if (Array.isArray(video.categories) && video.categories.length > 0) {
+    return video.categories.map((c: any) => c.name).join(', ');
+  }
+
+  return 'Uncategorized';
+};
+
+const filteredVideos = videos.filter((video) => {
+  // If no category is selected ("" or empty), show all videos
+  if (!filterCategory || filterCategory === "") return true;
+
+  const selectedCatId = String(filterCategory);
+
+  // Check if the selected ID matches video.category_id
+  const matchesSingleId = String(video.category_id) === selectedCatId;
+
+  // Check if the selected ID exists inside video.category_ids array
+  const matchesArrayIds = 
+    Array.isArray(video.category_ids) && 
+    video.category_ids.some((id: String) => String(id) === selectedCatId);
+
+  return matchesSingleId || matchesArrayIds;
+});
+
   return (
+    <ProtectedRoute>
     <AppLayout title="Video Management">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto flex-1">
@@ -369,7 +490,7 @@ export default function VideosPage() {
                 <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No videos found.</td>
               </tr>
             ) : filtered.map(video => {
-              const cat = categories.find(c => Number(c.id) === Number(video.category_id));
+              //const cat = categories.find(c => Number(c.id) === Number(video.category_id));
               return (
                 <tr key={video.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
@@ -392,7 +513,7 @@ export default function VideosPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {cat?.name || 'Unknown'}
+                    {getCategoryDisplay(video, categories)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col gap-1 items-start">
@@ -451,15 +572,60 @@ export default function VideosPage() {
               onChange={e => setFormData({...formData, description: e.target.value})}
             />
           </div>
-          <Select 
-            label="Category" 
-            value={formData.category_id || ''} 
-            onChange={e => setFormData({...formData, category_id: e.target.value})}
+          <div className="col-span-2 mb-2">
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Categories <span className="text-xs text-gray-400 font-normal">({(formData.category_ids || []).length} selected)</span>
+  </label>
+  <div className="p-2 bg-white border border-gray-300 rounded-md shadow-sm min-h-[42px] flex flex-wrap gap-1.5 items-center">
+    {(formData.category_ids || []).map((catId: any) => {
+      const cat = categories.find(c => String(c.id) === String(catId));
+      return (
+        <span
+          key={catId}
+          className="inline-flex items-center gap-1 bg-blue-50 text-[#2563EB] border border-blue-200 text-xs font-medium px-2 py-0.5 rounded"
+        >
+          {cat?.name || `Category ${catId}`}
+          <span
+            role="button"
+            onClick={() => {
+              const current = formData.category_ids || [];
+              setFormData({
+                ...formData,
+                category_ids: current.filter((id: any) => String(id) !== String(catId))
+              });
+            }}
+            className="text-blue-400 hover:text-blue-700 font-bold leading-none cursor-pointer"
+            title="Remove"
           >
-            <option value="">Select Category...</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-          <div className="w-full mb-4 relative" ref={langDropdownRef}>
+            ×
+          </span>
+        </span>
+      );
+    })}
+    <select
+      value=""
+      onChange={e => {
+        if (!e.target.value) return;
+        const current = formData.category_ids || [];
+        if (!current.map(String).includes(String(e.target.value))) {
+          setFormData({ ...formData, category_ids: [...current, String(e.target.value)] });
+        }
+      }}
+      className="flex-1 bg-transparent border-none text-sm focus:outline-none min-w-[140px] text-gray-500 cursor-pointer py-1"
+    >
+      <option value="">Select categories...</option>
+      {categories
+        .filter(c => !(formData.category_ids || []).map(String).includes(String(c.id)))
+        .map(c => (
+          <option key={c.id} value={String(c.id)}>
+            {c.name}
+          </option>
+        ))}
+    </select>
+  </div>
+</div>
+
+          {/* <div className="w-full mb-4 relative" ref={langDropdownRef}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Language <span className="text-xs text-gray-400 font-normal">({selectedLanguages.length} selected)</span>
             </label>
@@ -546,7 +712,8 @@ export default function VideosPage() {
                 </div>
               </div>
             )}
-          </div>
+          </div> */}
+
           <div className="col-span-2 mb-2">
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-gray-700">
@@ -554,7 +721,7 @@ export default function VideosPage() {
               </label>
               <button
                 type="button"
-                onClick={handleAddUrl}
+                onClick={handleAddStream}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-[#2563EB] hover:text-[#1D4ED8]"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -563,23 +730,35 @@ export default function VideosPage() {
                 Add URL
               </button>
             </div>
-            <div className="space-y-2">
-              {videoUrls.map((url, index) => (
-                <div key={index} className="flex items-center gap-2">
+            <div className="space-y-3">
+              {videoStreams.map((stream, index) => (
+                <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-md">
+                  <select
+                    value={stream.language}
+                    onChange={e => handleStreamLanguageChange(index, e.target.value)}
+                    className="w-1/3 px-2.5 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#2563EB]"
+                  >
+                    <option value="">Select Language...</option>
+                    {AVAILABLE_LANGUAGES.map(lang => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
+
                   <input
                     type="text"
-                    value={url}
-                    placeholder={index === 0 ? "e.g. https://example.com/video.mp4 (Primary URL)" : `URL ${index + 1}`}
-                    onChange={e => handleUrlChange(index, e.target.value)}
-                    onBlur={(e) => handleUrlBlur(e.target.value)}
+                    value={stream.stream_url}
+                    placeholder={index === 0 ? "e.g. https://example.com/video.mp4" : `Stream URL ${index + 1}`}
+                    onChange={e => handleStreamUrlChange(index, e.target.value)}
+                    onBlur={e => handleUrlBlur(e.target.value)}
                     className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
                   />
-                  {videoUrls.length > 1 && (
+
+                  {videoStreams.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => handleRemoveUrl(index)}
+                      onClick={() => handleRemoveStream(index)}
                       className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                      title="Remove URL"
+                      title="Remove Stream"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -590,6 +769,7 @@ export default function VideosPage() {
               ))}
             </div>
           </div>
+
           <div className="col-span-2">
             <Input 
               label="Thumbnail URL" 
@@ -635,9 +815,19 @@ export default function VideosPage() {
               />
               Featured
             </label>
+           <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={!!formData.isDefault}
+                onChange={e => setFormData({...formData, isDefault: e.target.checked})}
+                className="rounded border-gray-300 text-[#2563EB] focus:ring-[#2563EB]"
+              />
+              Default
+            </label>
           </div>
         </div>
       </Modal>
     </AppLayout>
+    </ProtectedRoute>
   );
 }

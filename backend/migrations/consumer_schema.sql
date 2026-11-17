@@ -114,3 +114,20 @@ CREATE TABLE video_tags (
     tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (video_id, tag_id)
 );
+
+CREATE TABLE IF NOT EXISTS video_category (
+    video_id INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    PRIMARY KEY (video_id, category_id),
+    CONSTRAINT fk_video
+        FOREIGN KEY (video_id) 
+        REFERENCES videos (id) 
+        ON DELETE CASCADE,
+    CONSTRAINT fk_category
+        FOREIGN KEY (category_id) 
+        REFERENCES categories (id) 
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_video_category_video_id ON video_category (video_id);
+CREATE INDEX IF NOT EXISTS idx_video_category_category_id ON video_category (category_id);
