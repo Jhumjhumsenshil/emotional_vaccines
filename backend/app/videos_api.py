@@ -197,7 +197,13 @@ def get_default_videos(db: Session = Depends(get_db)):
 @router.post("/champions/{token}/videos")
 def save_champion_video(token: str, payload: ChampionVideoCreate, db: Session = Depends(get_db)):
     # 1. Lookup customer/champion by token
-    customer = db.query(models.CustomerModel).filter(models.CustomerModel.id == token).first()
+    # customer = db.query(models.CustomerModel).filter(models.CustomerModel.id == token).first()
+
+    customer_db_id = int(token) if str(token).isdigit() else 0
+
+    customer = db.query(models.CustomerModel).filter(
+        models.CustomerModel.id == customer_db_id
+    ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer/Champion not found")
 
