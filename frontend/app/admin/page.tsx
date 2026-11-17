@@ -110,7 +110,7 @@ export default function SuperAdminDashboard() {
     setActionLoading((prev) => ({ ...prev, [user.id]: true }));
 
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/role`, {
+      const res = await fetch(`${API_BASE_URL}/admin/users/${user.id}/role`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role_name: roleToAssign }),
@@ -142,7 +142,7 @@ export default function SuperAdminDashboard() {
     setActionLoading((prev) => ({ ...prev, [user.id]: true }));
 
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/status`, {
+      const res = await fetch(`${API_BASE_URL}/admin/users/${user.id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: newActiveState }),
