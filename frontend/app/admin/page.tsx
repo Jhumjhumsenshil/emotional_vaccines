@@ -41,6 +41,8 @@ export default function SuperAdminDashboard() {
     setTimeout(() => setToast(null), 3500);
   };
 
+   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+
   // 1. Check auth & permissions
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -66,8 +68,8 @@ export default function SuperAdminDashboard() {
     try {
       setLoading(true);
       const [usersRes, rolesRes] = await Promise.all([
-        fetch('/api/admin/users'),
-        fetch('/api/roles'),
+        fetch(`${API_BASE_URL}/admin/users`),
+        fetch(`${API_BASE_URL}/roles`),
       ]);
 
       if (usersRes.ok && rolesRes.ok) {

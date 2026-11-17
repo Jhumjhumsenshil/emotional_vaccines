@@ -118,6 +118,9 @@ export default function RoleManagementPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+
   // 1. Auth Guard
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -143,8 +146,8 @@ export default function RoleManagementPage() {
     try {
       setIsLoading(true);
       const [rolesRes, permsRes] = await Promise.all([
-        fetch('/api/roles'),
-        fetch('/api/permissions'),
+        fetch(`${API_BASE_URL}/roles`),
+        fetch(`${API_BASE_URL}/permissions`),
       ]);
 
       if (!rolesRes.ok || !permsRes.ok) {
