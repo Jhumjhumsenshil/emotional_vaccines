@@ -640,11 +640,11 @@ export default function CustomersPage() {
       useEffect(() => {
         async function fetchOrgs() {
           try {
-            const res = await fetch(`${API_BASE_URL}/organizations`);
-            if (res.ok) {
-              const data = await res.json();
-              setOrganizations(data);
-            }
+            const res = await api.get(`${API_BASE_URL}/organizations`);
+            
+              const org = res.data;
+              setOrganizations(org);
+            
           } catch (err) {
             console.error('Failed to load organizations', err);
           }
