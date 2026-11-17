@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import AppLayout from '../../components/layout/AppLayout';
 import { Button, Input, Badge } from '../../components/ui/FormComponents';
 import Modal from '../../components/ui/Modal';
+import api from "@/utils/api";
+import ProtectedRoute from "../../components/ProtectedRoute";
 
 export interface Permission {
   id: number;
@@ -146,16 +148,16 @@ export default function RoleManagementPage() {
     try {
       setIsLoading(true);
       const [rolesRes, permsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/roles`),
-        fetch(`${API_BASE_URL}/permissions`),
+        api.get(`${API_BASE_URL}/roles`),
+        api.get(`${API_BASE_URL}/permissions`),
       ]);
 
-      if (!rolesRes.ok || !permsRes.ok) {
-        throw new Error('Failed to retrieve role and permission data from server');
-      }
+      // if (!rolesRes.ok || !permsRes.ok) {
+      //   throw new Error('Failed to retrieve role and permission data from server');
+      // }
 
-      const rolesData: RoleItem[] = await rolesRes.json();
-      const permsData: Permission[] = await permsRes.json();
+      const rolesData: RoleItem[] = rolesRes.data;
+      const permsData: Permission[] = permsRes.data;
 
       setRoles(rolesData);
       setPermissions(permsData);
@@ -275,54 +277,50 @@ export default function RoleManagementPage() {
   };
 
   // Handler: Save Role (Create or Edit)
-  const handleSaveRole = async () => {
-    const trimmedName = formData.name.trim();
-    if (!trimmedName) {
-      setFormErrors({ name: 'Role Name is required.' });
-      return;
-    }
+ const handleSaveRole = async () => {
+  const trimmedName = formData.name.trim();
+  if (!trimmedName) {
+    setFormErrors({ name: 'Role Name is required.' });
+    return;
+  }
 
-    setFormErrors({});
-    setIsSubmitting(true);
+  setFormErrors({});
+  setIsSubmitting(true);
 
-    try {
-      const isEditing = Boolean(activeRole);
-      const url = isEditing ? `/api/roles/${activeRole!.id}` : '/api/roles';
-      const method = isEditing ? 'PUT' : 'POST';
+  try {
+    const isEditing = Boolean(activeRole);
+    const url = isEditing ? `${API_BASE_URL}/roles/${activeRole!.id}` : `${API_BASE_URL}/roles`;
 
-      const payload = {
-        name: trimmedName,
-        description: formData.description.trim() || null,
-        permission_ids: formData.permission_ids,
-      };
+    const payload = {
+      name: trimmedName,
+      description: formData.description.trim() || null,
+      permission_ids: formData.permission_ids,
+    };
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+    // Use clean Axios .post() or .put() methods directly
+    const res = isEditing 
+      ? await api.put(url, payload) 
+      : await api.post(url, payload);
 
-      const data = await res.json();
+    const data = res.data; // Axios stores response body in .data directly
 
-      if (!res.ok) {
-        throw new Error(data.detail || 'Failed to save role');
-      }
+    showToast(
+      isEditing
+        ? `Role '${data.name}' was successfully updated.`
+        : `Role '${data.name}' was successfully created.`,
+      'success'
+    );
 
-      showToast(
-        isEditing
-          ? `Role '${data.name}' was successfully updated.`
-          : `Role '${data.name}' was successfully created.`,
-        'success'
-      );
-
-      setIsFormModalOpen(false);
-      fetchData();
-    } catch (err: any) {
-      showToast(err.message || 'An error occurred while saving the role.', 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    setIsFormModalOpen(false);
+    fetchData();
+  } catch (err: any) {
+    // Extract backend validation error detail safely from Axios error response
+    const errorMsg = err.response?.data?.detail || err.message || 'An error occurred while saving the role.';
+    showToast(errorMsg, 'error');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // Handler: Confirm Delete
   const handleConfirmDelete = async () => {
@@ -330,15 +328,13 @@ export default function RoleManagementPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/roles/${activeRole.id}`, {
-        method: 'DELETE',
-      });
+      const res = await api.delete(`/api/roles/${activeRole.id}`);
 
-      const data = await res.json();
+      const data = res.data;
 
-      if (!res.ok) {
-        throw new Error(data.detail || 'Failed to delete role');
-      }
+      // if (!res.ok) {
+      //   throw new Error(data.detail || 'Failed to delete role');
+      // }
 
       showToast(`Role '${activeRole.name}' deleted successfully.`, 'success');
       setIsDeleteModalOpen(false);
@@ -352,6 +348,7 @@ export default function RoleManagementPage() {
   };
 
   return (
+    <ProtectedRoute>
     <AppLayout title="Role Management">
       {/* Toast Notification */}
       {toast && (
@@ -1003,5 +1000,6 @@ export default function RoleManagementPage() {
         )}
       </Modal>
     </AppLayout>
+    </ProtectedRoute>
   );
 }

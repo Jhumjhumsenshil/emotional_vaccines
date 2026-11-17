@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AppLayout from '../components/layout/AppLayout';
+import api from "@/utils/api";
+import ProtectedRoute from "../components/ProtectedRoute";
+
 
 interface UserItem {
   id: number;
@@ -68,13 +71,13 @@ export default function SuperAdminDashboard() {
     try {
       setLoading(true);
       const [usersRes, rolesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/admin/users`),
-        fetch(`${API_BASE_URL}/roles`),
+        api.get(`${API_BASE_URL}/admin/users`),
+        api.get(`${API_BASE_URL}/roles`),
       ]);
 
-      if (usersRes.ok && rolesRes.ok) {
-        const usersData: UserItem[] = await usersRes.json();
-        const rolesData = await rolesRes.json();
+      //if (usersRes.ok && rolesRes.ok) {
+        const usersData: UserItem[] = usersRes.data;
+        const rolesData = rolesRes.data;
 
         setUsers(usersData);
         setRoles(rolesData);
@@ -85,9 +88,9 @@ export default function SuperAdminDashboard() {
           initialRoles[u.id] = u.role || 'Content Manager';
         });
         setSelectedRoles(initialRoles);
-      } else {
-        showToast('Failed to load user management data', 'error');
-      }
+      // } else {
+      //   showToast('Failed to load user management data', 'error');
+      // }
     } catch {
       showToast('Network error while connecting to server', 'error');
     } finally {
@@ -201,6 +204,7 @@ export default function SuperAdminDashboard() {
   }
 
   return (
+    <ProtectedRoute>
     <AppLayout title="User Management & Approvals">
       {/* Main Admin Dashboard Container */}
       <div className="admin-container" style={{ margin: 0, maxWidth: '100%', padding: 0 }}>
@@ -492,5 +496,6 @@ export default function SuperAdminDashboard() {
         </div>
       )}
     </AppLayout>
+    </ProtectedRoute>
   );
 }

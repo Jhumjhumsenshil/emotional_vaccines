@@ -660,8 +660,7 @@ export default function CustomersPage() {
 
   const fetchData = useCallback(async () => {
   try {
-    setLoading(true);
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+    setLoading(true); 
     
     const res = await api.get(`${API_BASE_URL}/customers`);
    // if (res.ok) {
@@ -845,38 +844,33 @@ useEffect(() => {
     }
     
     setSaving(true);
+
+    const payload = {
+    name: form.name.trim(),        
+    email: form.email.trim(),
+    phone: form.phone?.trim() || '',
+    customer_type: form.customerType,
+    organization_id: form.customerType === 'Organization-Based Customer' && form.organizationId 
+      ? Number(form.organizationId) 
+      : null,
+    is_active: form.status === 'active',
+    notes: form.notes?.trim() || '',
+    video_access: form.video_access || [],
+  };
   
-  try {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+  try {   
 
     // 1. Send the full customer profile directly to your customer endpoint
-    const res = await fetch(`${API_BASE_URL}/customers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: form.name.trim(),        
-        email: form.email.trim(),
-        phone: form.phone?.trim() || '',
-        customer_type: form.customerType,
-        organization_id: form.customerType === 'Organization-Based Customer' && form.organizationId 
-          ? Number(form.organizationId) 
-          : null,
-        is_active: form.status === 'active',
-        notes: form.notes?.trim() || '',
-        video_access: form.video_access || [], // Pass the selected video categories array
-      }),
-
-      
-    });
+    const res = await api.post(`${API_BASE_URL}/customers`, payload);
 
     console.log("Submitting payload:", {
-  name: form.name,
-  email: form.email,
-  video_access: form.video_access, // Check what prints in your browser console here
-});
+      name: form.name,
+      email: form.email,
+      video_access: form.video_access, // Check what prints in your browser console here
+    });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Failed to create customer');
+    const data = res.data;
+    //if (!res.ok) throw new Error(data.detail || 'Failed to create customer');
 
     showToast(`Customer "${form.name}" was successfully added.`);
     setShowAddModal(false);
@@ -888,80 +882,11 @@ useEffect(() => {
   }
 };
 
-  // ── Edit Customer ──
-  // const handleEditCustomer = async () => {
-  //   if (!editCustomer || !validateForm(true)) return;
-  //   setSaving(true);
-  //   try {
-  //     const id = editCustomer.id;
-
-  //     // Update status if changed
-  //     const currentStatus = getAccountStatus(editCustomer);
-  //     if (currentStatus !== form.status) {
-  //       await fetch(`/api/admin/users/${id}/status`, {
-  //         method: 'POST',
-  //         headers: { 'Content-Type': 'application/json' },
-  //         body: JSON.stringify({
-  //           is_active: form.status !== 'inactive',
-  //           status: form.status === 'active' ? 'approved' : 'pending',
-  //         }),
-  //       });
-  //     }
-
-  //     // Save updated organization and profile metadata
-  //     const selectedOrg = organizations.find((o) => o.id === Number(form.organizationId));
-  //     const orgId = form.customerType === 'Organization-Based Customer' ? Number(form.organizationId) : null;
-  //     const orgName = form.customerType === 'Organization-Based Customer' ? (selectedOrg?.name ?? null) : null;
-
-  //     saveCustomerMeta({
-  //       customerId: id,
-  //       customerType: form.customerType,
-  //       organizationId: orgId,
-  //       organizationName: orgName,
-  //       phoneNumber: form.phone.trim(),
-  //       accountStatus: form.status,
-  //     });
-
-  //     // Update local state immediately
-  //     setCustomers((prev) =>
-  //       prev.map((c) =>
-  //         c.id === id
-  //           ? {
-  //               ...c,
-  //               name: form.name.trim(),
-  //               email: form.email.trim(),
-  //               phoneNumber: form.phone.trim(),
-  //               customerType: form.customerType,
-  //               organizationId: orgId,
-  //               organizationName: orgName,
-  //               is_active: form.status !== 'inactive',
-  //               status: form.status === 'active' ? 'approved' : 'pending',
-  //             }
-  //           : c
-  //       )
-  //     );
-
-  //     showToast(`Customer "${form.name}" was successfully updated.`);
-  //     setEditCustomer(null);
-  //   } catch (err: unknown) {
-  //     showToast((err as Error).message || 'Failed to update customer.', 'error');
-  //   } finally {
-  //     setSaving(false);
-  //   }
-  // };
-
   const handleEditCustomer = async () => {
     if (!editCustomer || !validateForm(true)) return;
     setSaving(true);
-    
-    try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
-      const id = editCustomer.id;
 
-      const res = await fetch(`${API_BASE_URL}/customers/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+       const payload = {
           name: form.name.trim(),        
           email: form.email.trim(),
           phone: form.phone?.trim() || '',
@@ -972,17 +897,23 @@ useEffect(() => {
           is_active: form.status === 'active',
           video_access: form.video_access || [],
           notes: form.notes?.trim() || '',
-        }),
-      });
+      };
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to update customer');
+    
+    try {
+     
+      const id = editCustomer.id;
+
+      const res = await api.put(`${API_BASE_URL}/customers/${id}`, payload);
+
+      const data = res.data;
+      //if (!res.ok) throw new Error(data.detail || 'Failed to update customer');
 
       showToast(`Customer "${form.name}" was successfully updated.`);
       setEditCustomer(null);
       
       // Refresh your table list if you have fetchData implemented
-      // fetchData(); 
+       fetchData(); 
     } catch (err: unknown) {
       showToast((err as Error).message || 'Failed to update customer.', 'error');
     } finally {

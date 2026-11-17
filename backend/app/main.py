@@ -23,6 +23,8 @@ from app.db import get_db
 from app.models import User, Role, Permission
 from app import models, schemas
 
+from app.auth import verify_access_token
+
 app = FastAPI(title="Video Portal API")
 @app.get("/api/health")
 def health_check():
@@ -208,12 +210,12 @@ def login_user(credentials: LoginSchema, db: Session = Depends(get_db)):
 # ----------------------------------------------------
 # Roles & Admin User Management Endpoints
 # ----------------------------------------------------
-@app.get("/api/permissions", response_model=list[schemas.PermissionOut])
+@app.get("/api/permissions", response_model=list[schemas.PermissionOut], dependencies=[Depends(verify_access_token)])
 def get_all_permissions(db: Session = Depends(get_db)):
     return db.query(Permission).order_by(Permission.id.asc()).all()
 
 
-@app.get("/api/roles", response_model=list[schemas.RoleDetailOut])
+@app.get("/api/roles", response_model=list[schemas.RoleDetailOut], dependencies=[Depends(verify_access_token)])
 def get_roles(db: Session = Depends(get_db)):
     roles = db.query(Role).options(joinedload(Role.permissions), joinedload(Role.users)).order_by(Role.id.asc()).all()
     # Unique across joinedload
@@ -233,7 +235,7 @@ def get_roles(db: Session = Depends(get_db)):
     ]
 
 
-@app.get("/api/roles/{role_id}", response_model=schemas.RoleDetailOut)
+@app.get("/api/roles/{role_id}", response_model=schemas.RoleDetailOut, dependencies=[Depends(verify_access_token)])
 def get_role_by_id(role_id: int, db: Session = Depends(get_db)):
     role = db.query(Role).options(joinedload(Role.permissions), joinedload(Role.users)).filter(Role.id == role_id).first()
     if not role:
@@ -253,7 +255,7 @@ def get_role_by_id(role_id: int, db: Session = Depends(get_db)):
     )
 
 
-@app.post("/api/roles", response_model=schemas.RoleDetailOut, status_code=status.HTTP_201_CREATED)
+@app.post("/api/roles", response_model=schemas.RoleDetailOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_access_token)])
 def create_role(payload: schemas.RoleCreate, db: Session = Depends(get_db)):
     name = payload.name.strip()
     if not name:
@@ -302,7 +304,7 @@ def create_role(payload: schemas.RoleCreate, db: Session = Depends(get_db)):
     )
 
 
-@app.put("/api/roles/{role_id}", response_model=schemas.RoleDetailOut)
+@app.put("/api/roles/{role_id}", response_model=schemas.RoleDetailOut, dependencies=[Depends(verify_access_token)])
 def update_role(role_id: int, payload: schemas.RoleUpdate, db: Session = Depends(get_db)):
     role = db.query(Role).options(joinedload(Role.permissions), joinedload(Role.users)).filter(Role.id == role_id).first()
     if not role:
@@ -360,7 +362,7 @@ def update_role(role_id: int, payload: schemas.RoleUpdate, db: Session = Depends
     )
 
 
-@app.delete("/api/roles/{role_id}")
+@app.delete("/api/roles/{role_id}", dependencies=[Depends(verify_access_token)])
 def delete_role(role_id: int, db: Session = Depends(get_db)):
     role = db.query(Role).options(joinedload(Role.users)).filter(Role.id == role_id).first()
     if not role:
@@ -396,7 +398,7 @@ def delete_role(role_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/admin/users")
-def get_all_users(db: Session = Depends(get_db)):
+def get_all_users(db: Session = Depends(get_db), dependencies=[Depends(verify_access_token)]):
     users = db.query(User).options(joinedload(User.roles)).order_by(User.id.desc()).all()
     user_list = []
     for u in users:
@@ -418,7 +420,7 @@ def get_all_users(db: Session = Depends(get_db)):
 
 
 @app.post("/api/admin/users/{user_id}/role")
-def assign_user_role(user_id: int, payload: RoleAssignSchema, db: Session = Depends(get_db)):
+def assign_user_role(user_id: int, payload: RoleAssignSchema, db: Session = Depends(get_db), dependencies=[Depends(verify_access_token)]):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
@@ -502,7 +504,7 @@ def toggle_user_status(user_id: int, payload: StatusUpdateSchema, db: Session = 
 
 
 @app.delete("/api/admin/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(user_id: int, db: Session = Depends(get_db), dependencies=[Depends(verify_access_token)]):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(

@@ -10,12 +10,12 @@ from app.utils.email import send_champion_email
 
 router = APIRouter(prefix="/api/customers", tags=["Customers"])
 
-@router.get("", response_model=List[schemas.CustomerResponse], dependencies=[Depends(verify_access_token)],)
+@router.get("", response_model=List[schemas.CustomerResponse], dependencies=[Depends(verify_access_token)])
 def get_customers(db: Session = Depends(get_db)):
     customers = db.query(models.CustomerModel).all()
     return customers
 
-@router.post("", response_model=schemas.CustomerResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.CustomerResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_access_token)])
 def create_customer(
     payload: schemas.CustomerCreate, 
     background_tasks: BackgroundTasks,
@@ -61,7 +61,7 @@ def create_customer(
 
     return db_customer
 
-@router.put("/{customer_id}", response_model=schemas.CustomerResponse)
+@router.put("/{customer_id}", response_model=schemas.CustomerResponse, dependencies=[Depends(verify_access_token)])
 def update_customer(customer_id: int, payload: schemas.CustomerCreate, db: Session = Depends(get_db)):
     # Find existing customer
     db_customer = db.query(models.CustomerModel).filter(models.CustomerModel.id == customer_id).first()
