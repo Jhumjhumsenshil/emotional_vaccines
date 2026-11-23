@@ -73,7 +73,7 @@ export default function LoginPage() {
             className="w-52 sm:w-60 h-auto mx-auto mb-4 object-contain select-none drop-shadow-xs"
           />
           <h1 className="text-2xl sm:text-3xl font-bold text-[#1E3A5F] tracking-tight">Welcome Back</h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-1">Sign in to access your EmotionalVaccine portal</p>
+          <p className="text-gray-500 text-xs sm:text-sm mt-1">Sign in to access your EmotionalVaccines portal</p>
         </div>
 
         {/* Pending Approval Banner */}

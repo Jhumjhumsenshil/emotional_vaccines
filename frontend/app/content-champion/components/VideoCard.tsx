@@ -18,6 +18,7 @@ interface VideoRowProps {
   video: VideoItem;
   isAdded?: boolean;
   onAddToQueue?: (video: VideoItem) => void;
+  onThumbnailClick?: (video: VideoItem) => void;
 }
 
 function getCategoryClass(category?: string): string {
@@ -30,11 +31,21 @@ function getCategoryClass(category?: string): string {
   return 'cat-youth';
 }
 
-export default function VideoRow({ video, isAdded, onAddToQueue }: VideoRowProps) {
+export default function VideoRow({ video, isAdded, onAddToQueue, onThumbnailClick }: VideoRowProps) {
   return (
     <div className="video-row fade-up">
       {/* Thumbnail */}
-      <div className="video-thumb">
+      <div className="video-thumb" onClick={() => onThumbnailClick?.(video)}
+        title="Click to choose language and watch"
+        style={{
+          width: 110,
+          height: 64,
+          borderRadius: 6,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          position: 'relative',
+          backgroundColor: '#f3f4f6',
+        }}>
         <img src={video.thumbnail} alt={video.title} loading="lazy" />
         <span className="duration-badge">{video.duration}</span>
       </div>

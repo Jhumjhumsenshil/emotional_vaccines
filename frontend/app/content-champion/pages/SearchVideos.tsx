@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import VideoGrid from '../components/VideoGrid';
 
+
 interface VideoItem {
   id: string;
   title: string;
@@ -29,9 +30,10 @@ interface SearchVideosProps {
   queue?: VideoItem[];
   onAddToQueue?: (video: VideoItem) => void;
   sidebarFilters?: SidebarFilters;
+  onThumbnailClick?: (video: VideoItem) => void;
 }
 
-export default function SearchVideos({ queue = [], onAddToQueue, sidebarFilters = {} }: SearchVideosProps) {
+export default function SearchVideos({ queue = [], onAddToQueue, onThumbnailClick, sidebarFilters = {} }: SearchVideosProps) {
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -93,6 +95,7 @@ export default function SearchVideos({ queue = [], onAddToQueue, sidebarFilters 
           duration: formattedDuration,
           languages: mappedLangs,
           views: v.views || 100,
+          streams: v.streams || [],
           tags: v.tags ? v.tags.map((t: any) => typeof t === 'string' ? t : t.name) : [],
         };
       });
@@ -145,6 +148,8 @@ export default function SearchVideos({ queue = [], onAddToQueue, sidebarFilters 
 
   const addedIds = queue.map(v => v.id);
 
+
+
   return (
     <div>
       <div className="section-heading">
@@ -168,7 +173,9 @@ export default function SearchVideos({ queue = [], onAddToQueue, sidebarFilters 
         loading={loading}
         addedIds={addedIds}
         onAddToQueue={onAddToQueue}
+        onThumbnailClick = {onThumbnailClick}
       />
     </div>
   );
 }
+

@@ -14,6 +14,7 @@ interface VideoGridProps {
   loading?: boolean;
   addedIds?: string[];
   onAddToQueue?: (video: VideoItem) => void;
+  onThumbnailClick?: (video: VideoItem) => void;
 }
 
 function SkeletonRow() {
@@ -36,7 +37,7 @@ function SkeletonRow() {
   );
 }
 
-export default function VideoGrid({ videos = [], loading = false, addedIds = [], onAddToQueue }: VideoGridProps) {
+export default function VideoGrid({ videos = [], loading = false, addedIds = [], onAddToQueue, onThumbnailClick }: VideoGridProps) {
   if (loading) {
     return (
       <div className="video-table-wrap">
@@ -82,6 +83,7 @@ export default function VideoGrid({ videos = [], loading = false, addedIds = [],
           video={video}
           isAdded={addedIds.includes(video.id)}
           onAddToQueue={onAddToQueue}
+          onThumbnailClick = {onThumbnailClick}
         />
       ))}
     </div>

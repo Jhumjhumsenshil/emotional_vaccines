@@ -475,7 +475,7 @@ img {
 }
 
 .header-app-title {
-  font-size: 19px;
+  font-size: 30px;
   font-weight: 700;
   color: var(--gray-900);
   letter-spacing: -0.02em;
@@ -873,6 +873,20 @@ img {
   z-index: 30;
   width:calc(100% - 260px);
 }
+.footer-fullwidth {
+  position: fixed;
+  bottom: 0;
+  /*left: var(--sidebar-w);*/
+  right: 0;
+  background: var(--white);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 28px;
+  z-index: 30;
+  width:100%;
+}
 
 .footer-attendees {
   display: flex;
@@ -1092,6 +1106,7 @@ img {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
+  margin-bottom: 180px;
 }
 
 .recipients-table {

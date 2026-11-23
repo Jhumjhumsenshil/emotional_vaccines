@@ -31,6 +31,8 @@ def create_customer(
         if not org:
             raise HTTPException(status_code=404, detail="Selected organization not found.")
 
+        raw_token  = str(uuid.uuid4())
+
     # 3. Create customer instance with auto-generated unique tokens
     db_customer = models.CustomerModel(
         name=payload.name,       
@@ -43,8 +45,8 @@ def create_customer(
         notes=payload.notes,
         
         # Auto-generated secure tokens for dynamic links
-        consumer_token=str(uuid.uuid4()),
-        champion_token=str(uuid.uuid4())
+        consumer_token = raw_token,
+        champion_token=f"CC-{raw_token}"
     )
 
     db.add(db_customer)

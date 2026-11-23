@@ -15,6 +15,14 @@ interface RecipientItem {
   avatar: string;
 }
 
+interface VideoStream {
+  language: string;
+  stream_url?: string;
+  url?: string;
+  video_url?: string;
+  thumbnail_url?: string;
+}
+
 interface VideoItem {
   id: string;
   title: string;
@@ -23,6 +31,7 @@ interface VideoItem {
   thumbnail?: string;
   rating?: number;
   languages?: string[];
+  streams?: VideoStream[];
   [key: string]: any;
 }
 
@@ -31,6 +40,8 @@ interface MyRecipientsProps {
   removedIds?: string[];
   onRemoveVideo?: (id: string) => void;
   onRefreshVideos?: () => Promise<void> | void;
+  onThumbnailClick?: (video: VideoItem) => void;
+  championId?: number;
 }
 
 // ── Fallback recipients list ──────────────────────────────────────────────
@@ -60,7 +71,7 @@ function StarRating({ value, onChange }: { value: number; onChange?: (val: numbe
       {[1, 2, 3, 4, 5].map(star => (
         <svg
           key={star}
-          width="15" height="15" viewBox="0 0 24 24"
+          width="25" height="25" viewBox="0 0 24 24"
           fill={star <= display ? '#d1d5db' : 'none'}
           stroke="#d1d5db" strokeWidth="1.5"
           style={{ cursor: 'pointer', transition: 'fill 0.1s' }}
@@ -127,7 +138,7 @@ function AddModal({ onClose, onAdd }: { onClose: () => void; onAdd: (form: any) 
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────
-export default function MyRecipients({ queue = [], removedIds = [], onRemoveVideo }: MyRecipientsProps) {
+export default function MyRecipients({ queue = [], removedIds = [], onRemoveVideo, onThumbnailClick, championId }: MyRecipientsProps) {
   //const [recipients, setRecipients] = useState<RecipientItem[]>(FALLBACK_RECIPIENTS);
   const [apiVideos, setApiVideos] = useState<VideoItem[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -205,6 +216,47 @@ export default function MyRecipients({ queue = [], removedIds = [], onRemoveVide
     ? [...videos].sort((a, b) => a.title.localeCompare(b.title))
     : videos;
 
+
+
+  const handleRateVideo = async (videoId: string | number, val: number) => {
+  const videoIdStr = String(videoId);
+  const previousRating = ratings[videoIdStr];
+
+  // 1. Optimistic UI update so the star highlights immediately
+  setRatings((prev) => ({ ...prev, [videoIdStr]: val }));
+
+  if (!championId) return;
+
+  try {
+    const vid = videos.find((v) => String(v.id) === videoIdStr);
+    const selectedLang = getLangToggle(videoIdStr, 'SP') ? 'SP' : 'EN';
+
+    const res = await fetch(
+      `${API_BASE_URL}/videos/champions/${championId}/videos`,
+      {
+        method: 'POST', // or PATCH /videos/champions/${championId}/videos/${videoIdStr}
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          video_id: Number(videoId),
+          rating: val,
+          selected_language: vid?.selected_language || selectedLang,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`Failed to save rating (${res.status})`);
+    }
+  } catch (err) {
+    console.error('Error saving video rating:', err);
+    // Revert optimistic update on failure
+    setRatings((prev) => ({
+      ...prev,
+      [videoIdStr]: previousRating ?? 0,
+    }));
+  }
+};  
+
   return (
     <div>
       {/* Sort buttons */}
@@ -239,91 +291,204 @@ export default function MyRecipients({ queue = [], removedIds = [], onRemoveVide
 
       {/* Table */}
       <div className="recipients-table-wrap">
-        <table className="recipients-table" style={{ tableLayout: 'fixed', width: '100%' }}>
-          <colgroup>
-            <col style={{ width: 46 }} />
-            <col style={{ width: 175 }} />
-            <col style={{ width: 145 }} />
-            <col style={{ width: 44 }} />
-            <col style={{ width: 44 }} />
-            <col />
-            <col style={{ width: 42 }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>View</th>
-              <th>Title</th>
-              <th>My Star Rating</th>
-              <th style={{ textAlign: 'center' }}>EN</th>
-              <th style={{ textAlign: 'center' }}>SP</th>
-              <th>Description</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayed.map(vid => (
-              <tr key={vid.id}>
-                {/* Thumbnail */}
-                <td style={{ padding: '10px 8px' }}>
-                  <div style={{ width: 36, height: 28, borderRadius: 4, overflow: 'hidden', background: '#f3f4f6', flexShrink: 0 }}>
-                    {vid.thumbnail
-                      ? <img src={vid.thumbnail} alt={vid.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                        </div>
-                    }
-                  </div>
-                </td>
+        <div
+  className="recipients-list-wrap"
+  style={{
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    border: '1px solid #e5e7eb',
+    overflowX: 'auto',
+  }}
+>
+  <div style={{ minWidth: 760 }}>
+    {/* Header Row */}
+    <div
+      className="recipients-list-header"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '126px 150px 145px 48px 48px minmax(200px, 1fr) 44px',
+        alignItems: 'center',
+        padding: '10px 12px',
+        backgroundColor: '#f9fafb',
+        borderBottom: '1px solid #e5e7eb',
+        fontSize: 12,
+        fontWeight: 600,
+        color: '#6b7280',
+      }}
+    >
+      <div>View</div>
+      <div>Title</div>
+      <div>My Star Rating</div>
+      <div style={{ textAlign: 'center' }}>EN</div>
+      <div style={{ textAlign: 'center' }}>SP</div>
+      <div>Description</div>
+      <div />
+    </div>
 
-                {/* Title + category */}
-                <td style={{ padding: '10px 8px' }}>
-                  <div style={{ fontWeight: 700, color: '#111827', fontSize: 13, lineHeight: 1.3 }}>{vid.title}</div>
-                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{vid.category}</div>
-                </td>
-
-                {/* Stars */}
-                <td style={{ padding: '10px 8px' }}>
-                  <StarRating value={ratings[vid.id] ?? vid.rating ?? 0} onChange={(val) => setRating(vid.id, val)} />
-                </td>
-
-                {/* EN */}
-                <td style={{ textAlign: 'center', padding: '10px 4px' }}>
-                  <input type="checkbox" checked={getLangToggle(vid.id, 'English') || getLangToggle(vid.id, 'EN')} onChange={() => toggleLang(vid.id, 'EN')}
-                    style={{ accentColor: '#f97316', width: 15, height: 15, cursor: 'pointer' }} />
-                </td>
-
-                {/* SP */}
-                <td style={{ textAlign: 'center', padding: '10px 4px' }}>
-                  <input type="checkbox" checked={getLangToggle(vid.id, 'Spanish') || getLangToggle(vid.id, 'SP')} onChange={() => toggleLang(vid.id, 'SP')}
-                    style={{ accentColor: '#f97316', width: 15, height: 15, cursor: 'pointer' }} />
-                </td>
-
-                {/* Description */}
-                <td style={{ padding: '10px 8px', fontSize: 12, color: '#374151', lineHeight: 1.5 }}>
-                  {vid.description}
-                </td>
-
-                {/* Remove */}
-                <td style={{ textAlign: 'center', padding: '10px 4px' }}>
-                  <button
-                    onClick={() => handleRemove(vid.id)}
-                    title="Remove from list"
-                    style={{
-                      width: 26, height: 26, borderRadius: 4,
-                      background: '#f97316', border: 'none',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer',
-                    }}
+    {/* Video Rows */}
+    <div className="recipients-list-body">
+      {displayed.map((vid) => (
+        <div
+          key={vid.id}
+          className="recipients-list-row"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '126px 150px 145px 48px 48px minmax(200px, 1fr) 44px',
+            alignItems: 'center',
+            padding: '10px 12px',
+            borderBottom: '1px solid #f3f4f6',
+          }}
+        >
+          {/* Thumbnail */}
+          <div style={{ paddingRight: 8 }}>
+            <div
+              className="video-thumb"
+              onClick={() => onThumbnailClick?.(vid)}
+              title="Click to choose language and watch"
+              style={{
+                width: 110,
+                height: 64,
+                borderRadius: 6,
+                overflow: 'hidden',
+                cursor: 'pointer',
+                position: 'relative',
+                backgroundColor: '#f3f4f6',
+              }}
+            >
+              {vid.thumbnail ? (
+                <img
+                  src={vid.thumbnail}
+                  alt={vid.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#9ca3af"
+                    strokeWidth="1.5"
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                      <line x1="5" y1="12" x2="19" y2="12"/>
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Title + Category */}
+          <div style={{ paddingRight: 8 }}>
+            <div
+              style={{
+                fontWeight: 700,
+                color: '#111827',
+                fontSize: 13,
+                lineHeight: 1.3,
+              }}
+            >
+              {vid.title}
+            </div>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+              {vid.category}
+            </div>
+          </div>
+
+          {/* Stars */}
+          <div style={{ paddingRight: 8 }}>
+            <StarRating
+              value={ratings[vid.id] ?? vid.rating ?? 0}
+              onChange={(val) => handleRateVideo(vid.id, val)}
+            />
+          </div>
+
+          {/* EN */}
+          <div style={{ textAlign: 'center', padding: '0 4px' }}>
+            <input
+              type="checkbox"
+              checked={getLangToggle(vid.id, 'English') || getLangToggle(vid.id, 'EN')}
+              onChange={() => toggleLang(vid.id, 'EN')}
+              style={{
+                accentColor: '#f97316',
+                width: 15,
+                height: 15,
+                cursor: 'pointer',
+              }}
+            />
+          </div>
+
+          {/* SP */}
+          <div style={{ textAlign: 'center', padding: '0 4px' }}>
+            <input
+              type="checkbox"
+              checked={getLangToggle(vid.id, 'Spanish') || getLangToggle(vid.id, 'SP')}
+              onChange={() => toggleLang(vid.id, 'SP')}
+              style={{
+                accentColor: '#f97316',
+                width: 15,
+                height: 15,
+                cursor: 'pointer',
+              }}
+            />
+          </div>
+
+          {/* Description */}
+          <div
+            style={{
+              padding: '0 8px',
+              fontSize: 12,
+              color: '#374151',
+              lineHeight: 1.5,
+            }}
+          >
+            {vid.description}
+          </div>
+
+          {/* Remove */}
+          <div style={{ textAlign: 'center', paddingLeft: 4 }}>
+            <button
+              type="button"
+              onClick={() => handleRemove(vid.id)}
+              title="Remove from list"
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 4,
+                background: '#f97316',
+                border: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.5"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</div>
 
         {displayed.length === 0 && (
           <div className="empty-state">

@@ -5,8 +5,10 @@ interface PageProps {
   params: Promise<{ token: string }>;
 }
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+
 async function getChampionData(token: string) {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+  
   try {
     const res = await fetch(`${API_BASE_URL}/videos/champions/${token}`, { cache: 'no-store' });
     if (!res.ok) return null;
@@ -18,7 +20,6 @@ async function getChampionData(token: string) {
 }
 
 async function getDefaultVideos() {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
   try {
     const res = await fetch(`${API_BASE_URL}/videos/default_video`, { cache: 'no-store' });
     if (!res.ok) return [];
@@ -33,7 +34,8 @@ async function getDefaultVideos() {
           thumbnail: v.default_thumbnail_url,
           isDefault: v.is_default,
           category: v.categories?.[0]?.name || 'General',
-          languages: v.streams?.map((s: any) => s.language) || ['EN']
+          languages: v.streams?.map((s: any) => s.language) || ['EN'],
+          streams: v.streams || [],
         }));
     }
     return [];

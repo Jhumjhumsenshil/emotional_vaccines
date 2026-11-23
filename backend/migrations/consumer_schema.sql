@@ -131,3 +131,25 @@ CREATE TABLE IF NOT EXISTS video_category (
 
 CREATE INDEX IF NOT EXISTS idx_video_category_video_id ON video_category (video_id);
 CREATE INDEX IF NOT EXISTS idx_video_category_category_id ON video_category (category_id);
+
+
+
+/////////Nov 19th/////////////
+
+
+CREATE TABLE video_clicks (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    video_id VARCHAR(255) NOT NULL,
+    video_title VARCHAR(500),
+    language VARCHAR(10) NOT NULL DEFAULT 'EN',
+    count INTEGER NOT NULL DEFAULT 1 CHECK (count > 0),
+    clicked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Single-column & composite indexes for fast statistics and dashboard queries
+CREATE INDEX ix_video_clicks_customer_id ON video_clicks (customer_id);
+CREATE INDEX ix_video_clicks_video_id ON video_clicks (video_id);
+CREATE INDEX ix_video_clicks_clicked_at ON video_clicks (clicked_at);
+CREATE INDEX ix_video_clicks_customer_date ON video_clicks (customer_id, clicked_at);
+CREATE INDEX ix_video_clicks_video_date ON video_clicks (video_id, clicked_at);

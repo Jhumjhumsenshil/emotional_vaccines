@@ -8,6 +8,12 @@ import MyRecipients from '../pages/MyRecipients';
 import Statistics from '../pages/Statistics';
 import '../styles/globals.css';
 import logoImg from '../../assets/logo.png';
+import api from "@/utils/api";
+
+import ChooseLanguageModal, {
+  getLanguageUrl,
+  LanguageModalVideo,
+} from '../components/ChooseLanguageModal';
 
 interface DashboardProps {
   champion: {
@@ -25,6 +31,7 @@ interface DashboardProps {
     isDefault: any;
     category: any;
     languages: any;
+    streams: any;
   }>;
 }
 
@@ -91,10 +98,11 @@ export default function ContentChampionDashboard({
     return new Set(initialDefaultVideos.map((v) => String(v.id)));
   }, [initialDefaultVideos]);
 
+   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
   // Helper to fetch saved videos from champion_videos table and merge with defaults
   const fetchSavedChampionVideos = useCallback(async () => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+     
       const identifier = champion.id;
 
       const res = await fetch(`${API_BASE_URL}/videos/champions/${identifier}/videos`);
@@ -109,8 +117,25 @@ export default function ContentChampionDashboard({
         });
 
         // 2. Add/overwrite with customer's saved videos from champion_videos
+        // savedVideos.forEach((video) => {
+        //   videoMap.set(String(video.id), video);
+        // });
+
         savedVideos.forEach((video) => {
-          videoMap.set(String(video.id), video);
+          const key = String(video.id);
+          const existing = videoMap.get(key);
+          videoMap.set(key, {
+            ...existing,
+            ...video,
+            id: key,
+            title: video.title || video.default_title || existing?.title || '',
+            description: video.description || video.default_description || existing?.description || '',
+            thumbnail: video.thumbnail || video.default_thumbnail_url || existing?.thumbnail || '',
+            streams:
+              Array.isArray(video.streams) && video.streams.length > 0
+                ? video.streams
+                : existing?.streams || [],
+          });
         });
 
         // 3. Filter out any videos removed during this session
@@ -246,6 +271,48 @@ export default function ContentChampionDashboard({
     [searchTerm, selectedCategories, selectedLanguages, selectedKeywords]
   );
 
+
+  
+  const [selectedVideoForLang, setSelectedVideoForLang] =
+  useState<LanguageModalVideo | null>(null);
+
+const handleThumbnailClick = (video: LanguageModalVideo) => {
+  const enUrl = getLanguageUrl(video, 'EN');
+  const spUrl = getLanguageUrl(video, 'SP');
+
+  if (enUrl && spUrl) {
+    setSelectedVideoForLang(video);
+  } else if (enUrl) {
+    handleConfirmLanguage(video, 'EN', enUrl);
+  } else if (spUrl) {
+    handleConfirmLanguage(video, 'SP', spUrl);
+  } else {
+    setSelectedVideoForLang(video);
+  }
+};
+
+const handleConfirmLanguage = (
+  video: LanguageModalVideo,
+  lang: 'EN' | 'SP',
+  targetUrl: string
+) => {
+  if (champion?.id) {
+    api
+      .post('/videos/track-click', {
+        customer_id: champion.id,
+        video_id: String(video.id),
+        video_title: video.title,
+        language: lang,
+        //count: groupSize || 1,
+        count: 1,
+      })
+      .catch((err) => console.error('Failed to track video click:', err));
+  }
+
+  setSelectedVideoForLang(null);
+  window.open(targetUrl, '_blank', 'noopener,noreferrer');
+};
+
   return (
 
     
@@ -286,6 +353,7 @@ export default function ContentChampionDashboard({
             sidebarFilters={sidebarFilters}
             queue={queue}
             onAddToQueue={handleAddToQueue}
+            onThumbnailClick={handleThumbnailClick}
           />
         )}
 
@@ -295,6 +363,8 @@ export default function ContentChampionDashboard({
             removedIds={removedIds}
             onRemoveVideo={handleRemoveRecipientVideo}
             onRefreshVideos={fetchSavedChampionVideos}
+            onThumbnailClick={handleThumbnailClick}
+            championId={champion.id}
             
           />
         )}
@@ -302,7 +372,7 @@ export default function ContentChampionDashboard({
         {activeTab === 'stats' && <Statistics />}
       </div>
 
-      <div className="footer-bar">
+      <div className={activeTab === 'videos' ? 'footer-bar' : 'footer-fullwidth'} >
         <div className="footer-attendees">
           <div className="attendee-counter">
             <div className="attendee-number">1</div>
@@ -338,6 +408,14 @@ export default function ContentChampionDashboard({
       </div>
     </div>
   </div>
+
+      <ChooseLanguageModal
+        video={selectedVideoForLang}
+        onClose={() => setSelectedVideoForLang(null)}
+        onSelectLanguage={handleConfirmLanguage}
+    />
 </div>
-  );
+
+  ); 
 }
+

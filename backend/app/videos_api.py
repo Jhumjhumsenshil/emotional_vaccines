@@ -172,7 +172,9 @@ def get_default_videos(db: Session = Depends(get_db)):
     """
     default_videos = db.query(models.VideoModel).filter(
         models.VideoModel.is_default == True,
-        models.VideoModel.is_published == True).all()
+        models.VideoModel.is_published == True).options(
+            joinedload(models.VideoModel.streams),
+        ).all()
     
     if not default_videos:
         # Optional: return an empty list or raise 404 depending on your preference
